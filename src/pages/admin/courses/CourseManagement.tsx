@@ -105,7 +105,7 @@ const CourseManagement = () => {
       if (course.instructor_avatar) {
         const avatarFile = course.instructor_avatar.split('/').pop();
         if (avatarFile) {
-          await tryDeleteFromFolders(['avatars', 'instructorAvatar'], avatarFile);
+          await tryDeleteFromFolders(['avatars', 'instructor_avatar'], avatarFile);
         }
       }
 

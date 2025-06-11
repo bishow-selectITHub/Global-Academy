@@ -39,6 +39,10 @@ interface Course {
   rating?: number;
 }
 
+interface CourseEnrollment {
+  courses: Course;
+}
+
 const LearnerDashboard = () => {
   const [fetchedCourses, setFetchedCourses] = useState<Course[]>([]);
   const [myCourses, setMyCourses] = useState<Course[]>([]);
@@ -110,10 +114,26 @@ const LearnerDashboard = () => {
 
         if (error) throw error;
 
-        const enrolledCourses = data.map(enrollment=> enrollment.courses);
-      
-      
+        const enrolledCourses = (data as unknown as CourseEnrollment[]).map(enrollment => {
+          const course = enrollment.courses;
+          // Calculate progress based on completed lessons
+          const completedLessonsCount = course.lessons?.filter((l: Lesson) => l.completed).length || 0;
+          const totalLessonsCount = course.lessons?.length || 0;
+          const calculatedProgress = totalLessonsCount > 0 
+            ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
+            : 0;
 
+          // Find the next incomplete lesson
+          const nextLesson = course.lessons?.find((l: Lesson) => !l.completed)?.title || 'Course Completed';
+
+          return {
+            ...course,
+            progress: calculatedProgress,
+            lastAccessed: '2 days ago', // You might want to store and fetch this from the database
+            nextLesson
+          };
+        });
+      
         setMyCourses(enrolledCourses);
       } catch (error: any) {
         addToast({
@@ -136,7 +156,7 @@ const LearnerDashboard = () => {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user?.name}</h1>
         <p className="text-slate-600 mt-1">
-          Your learning journey continues. You have {fetchedCourses.length} courses in progress.
+          Your learning journey continues. You have {myCourses.length} courses in progress.
         </p>
       </div>
 
@@ -146,7 +166,7 @@ const LearnerDashboard = () => {
             <div className="flex justify-between">
               <div className="space-y-1">
                 <p className="text-sm text-slate-500">Courses in Progress</p>
-                <p className="text-2xl font-semibold">{fetchedCourses.length}</p>
+                <p className="text-2xl font-semibold">{myCourses.length}</p>
               </div>
               <div className="p-3 bg-blue-50 rounded-full">
                 <BookOpen size={20} className="text-blue-600" />
@@ -221,9 +241,11 @@ const LearnerDashboard = () => {
                     </div>
                     
                     <div className="flex space-x-3">
-                      <Button size="sm" variant="primary" as={Link} to={`/courses/${course.id}`}>
-                        Continue
-                      </Button>
+                      <Link to={`/courses/${course.id}`} className="inline-block">
+                        <Button size="sm" variant="primary">
+                          Continue
+                        </Button>
+                      </Link>
                       <Button size="sm" variant="outline">View Details</Button>
                     </div>
                   </div>
@@ -237,14 +259,14 @@ const LearnerDashboard = () => {
           
           <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-slate-900">Recommended Courses</h2>
+              <h2 className="text-xl font-semibold text-slate-900">All Courses</h2>
               <Link to="/courses" className="text-sm text-blue-600 hover:text-blue-700">
                 View All Courses
               </Link>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {fetchedCourses.slice(0, 4).map(course => (
+              {fetchedCourses.map(course => (
                 <Card key={course.id} className="overflow-hidden hover:shadow-md transition-shadow">
                   <div className="h-40">
                     <img 

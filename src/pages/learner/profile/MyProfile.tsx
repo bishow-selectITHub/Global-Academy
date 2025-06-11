@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Card, 
   CardHeader, 
@@ -18,98 +18,195 @@ import {
   GraduationCap, 
   Award,
   Settings,
-  Shield,
-  Bell,
   Save,
-  Clock
+  Clock,
+  Camera
 } from 'lucide-react';
 import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../components/ui/Toaster';
+import { supabase } from '../../../lib/supabase';
+
+interface Education {
+  id: string;
+  degree: string;
+  institution: string;
+  year: string;
+}
+
+interface UserProfile {
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  avatar?: string;
+  department: string;
+  position: string;
+  bio: string;
+  education: Education[];
+  skills: string[];
+}
+
+const DEFAULT_SKILLS = ['Project Management', 'Leadership', 'Communication', 'Teamwork', 'Problem Solving'];
 
 const MyProfile = () => {
   const { user } = useUser();
   const { addToast } = useToast();
   
-  // Extended profile information (this would come from the backend in a real app)
-  const [profile, setProfile] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: '+1 (555) 123-4567',
-    location: 'New York, NY',
-    department: 'Marketing',
-    position: 'Marketing Specialist',
-    joinDate: 'January 15, 2025',
-    bio: 'Marketing professional with 5 years of experience in digital marketing and content strategy.',
-    education: [
-      {
-        id: 'edu-1',
-        degree: 'Bachelor of Business Administration',
-        institution: 'State University',
-        year: '2021'
-      }
-    ],
-    skills: ['Digital Marketing', 'Content Strategy', 'Social Media', 'Data Analysis'],
-    preferences: {
-      emailNotifications: true,
-      smsNotifications: false,
-      learningReminders: true,
-      weeklyDigest: true
-    },
-    security: {
-      mfaEnabled: false,
-      lastPasswordChange: '3 months ago',
-      loginAlerts: true
-    }
-  });
-  
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security'>('profile');
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [activeTab, setActiveTab] = useState<'profile'>('profile');
   const [isEditing, setIsEditing] = useState(false);
-  const [tempProfile, setTempProfile] = useState(profile);
-  const [isLoading, setIsLoading] = useState(false);
+  const [tempProfile, setTempProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Handle input changes when editing
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('name, email, phone, location, avatar, department, position, bio, education, skills')
+          .eq('id', user.id)
+          .single();
+
+          console.log(data);
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          const parsedEducation = data.education ? JSON.parse(data.education) : [];
+          const parsedSkills = data.skills ? JSON.parse(data.skills) : [];
+
+          const profileData: UserProfile = {
+            name: data.name || '',
+            email: data.email || '',
+            phone: data.phone || '',
+            location: data.location || '',
+            avatar: data.avatar || '',
+            department: data.department || '',
+            position: data.position || '',
+            bio: data.bio || '',
+            education: parsedEducation,
+            skills: parsedSkills,
+          };
+          setProfile(profileData);
+          setTempProfile(profileData);
+        }
+      } catch (error: any) {
+        addToast({
+          type: 'error',
+          title: 'Error fetching profile',
+          message: error.message,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [user, addToast]);
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
-    setTempProfile(prev => ({
+    setTempProfile(prev => prev ? {
       ...prev,
       [name]: value
-    }));
+    } : null);
   };
   
-  // Handle checkbox changes for preferences
-  const handlePreferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target;
-    
-    setTempProfile(prev => ({
-      ...prev,
-      preferences: {
-        ...prev.preferences,
-        [name]: checked
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user || !tempProfile || !event.target.files || event.target.files.length === 0) {
+      return;
+    }
+
+    setIsLoading(true);
+    const file = event.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('user-assets')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
       }
-    }));
-  };
-  
-  // Handle security setting changes
-  const handleSecurityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target;
-    
-    setTempProfile(prev => ({
-      ...prev,
-      security: {
-        ...prev.security,
-        [name]: checked
+
+      const { data: publicUrlData } = supabase.storage
+        .from('user-assets')
+        .getPublicUrl(filePath);
+      
+      if (publicUrlData) {
+        const avatarUrl = publicUrlData.publicUrl;
+        console.log('Uploaded avatar public URL:', avatarUrl);
+        
+        // Update the avatar URL in the users table immediately
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ avatar: avatarUrl })
+          .eq('id', user.id);
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        // Update the local state
+        setTempProfile(prev => prev ? { ...prev, avatar: avatarUrl } : null);
+        setProfile(prev => prev ? { ...prev, avatar: avatarUrl } : null);
+        
+        addToast({
+          type: 'success',
+          title: 'Avatar uploaded',
+          message: 'Your avatar has been updated.',
+        });
       }
-    }));
+    } catch (error: any) {
+      addToast({
+        type: 'error',
+        title: 'Upload failed',
+        message: error.message,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
   
-  // Save profile changes
   const saveChanges = async () => {
+    if (!user || !tempProfile) return;
     setIsLoading(true);
     
     try {
-      // In a real app, this would be an API call to update the profile
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase
+        .from('users')
+        .update({
+          name: tempProfile.name,
+          phone: tempProfile.phone,
+          location: tempProfile.location,
+          avatar: tempProfile.avatar || '',
+          department: tempProfile.department,
+          position: tempProfile.position,
+          bio: tempProfile.bio,
+          education: JSON.stringify(tempProfile.education),
+          skills: JSON.stringify(tempProfile.skills),
+        })
+        .eq('id', user.id);
+      
+      if (error) {
+        throw error;
+      }
       
       setProfile(tempProfile);
       setIsEditing(false);
@@ -119,7 +216,7 @@ const MyProfile = () => {
         title: 'Profile updated',
         message: 'Your changes have been saved successfully',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
       addToast({
         type: 'error',
@@ -131,48 +228,59 @@ const MyProfile = () => {
     }
   };
   
-  // Cancel editing
   const cancelEditing = () => {
     setTempProfile(profile);
     setIsEditing(false);
   };
   
-  // Add a new skill
   const addSkill = (newSkill: string) => {
-    if (newSkill && !tempProfile.skills.includes(newSkill)) {
-      setTempProfile(prev => ({
+    if (newSkill && tempProfile && !tempProfile.skills.includes(newSkill)) {
+      setTempProfile(prev => prev ? ({
         ...prev,
         skills: [...prev.skills, newSkill]
-      }));
+      }) : null);
     }
   };
   
-  // Remove a skill
   const removeSkill = (skillToRemove: string) => {
-    setTempProfile(prev => ({
+    setTempProfile(prev => prev ? ({
       ...prev,
       skills: prev.skills.filter(skill => skill !== skillToRemove)
-    }));
+    }) : null);
   };
-  
-  // Function to handle enabling MFA (in a real app, this would open a setup flow)
-  const handleEnableMFA = () => {
-    addToast({
-      type: 'info',
-      title: 'MFA Setup',
-      message: 'This would launch the MFA setup process in a real application',
-    });
+
+  const handleEducationChange = (id: string, field: string, value: string) => {
+    setTempProfile(prev => prev ? {
+      ...prev,
+      education: prev.education.map(edu =>
+        edu.id === id ? { ...edu, [field]: value } : edu
+      )
+    } : null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="animate-pulse">
+        <div className="h-8 bg-slate-200 rounded w-1/4 mb-6"></div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="md:col-span-1 h-96 bg-slate-200 rounded-lg"></div>
+          <div className="md:col-span-3 h-96 bg-slate-200 rounded-lg"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile || !tempProfile) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Profile not found</h2>
+        <p className="text-slate-600 mb-6">Please ensure you are logged in or your profile exists.</p>
+      </div>
+    );
+  }
   
-  // Change password function (in a real app, this would open a change password flow)
-  const handleChangePassword = () => {
-    addToast({
-      type: 'info',
-      title: 'Change Password',
-      message: 'This would launch the password change process in a real application',
-    });
-  };
-  
+  console.log('Avatar URL being rendered:', tempProfile.avatar);
+
   return (
     <div>
       <div className="mb-8">
@@ -183,23 +291,34 @@ const MyProfile = () => {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Left column: Profile summary and navigation */}
         <div className="md:col-span-1">
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col items-center">
                 <div className="relative mb-4">
                   <div className="h-24 w-24 rounded-full overflow-hidden bg-blue-100">
-                    <img
-                      src={user?.profilePicture || "https://via.placeholder.com/96x96.png?text=User"}
-                      alt={profile.name}
-                      className="h-full w-full object-cover"
-                    />
+                        <img
+      key={tempProfile.avatar || 'placeholder'}
+      src={tempProfile.avatar || profile.avatar}
+      alt={profile.name}
+      className="w-full h-full object-cover object-top"
+    />
                   </div>
                   {isEditing && (
-                    <button className="absolute bottom-0 right-0 bg-blue-600 text-white p-1.5 rounded-full">
-                      <Settings size={14} />
-                    </button>
+                    <label 
+                      htmlFor="avatar-upload"
+                      className="absolute bottom-0 right-0 bg-blue-600 text-white p-1.5 rounded-full cursor-pointer hover:bg-blue-700 transition"
+                    >
+                      <Camera size={14} />
+                      <input
+                        type="file"
+                        id="avatar-upload"
+                        className="hidden"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        onChange={handleAvatarChange}
+                      />
+                    </label>
                   )}
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900">{profile.name}</h3>
@@ -232,39 +351,15 @@ const MyProfile = () => {
                     <User className="mr-3 h-5 w-5" />
                     Profile Information
                   </button>
-                  <button
-                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                      activeTab === 'preferences'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                    onClick={() => setActiveTab('preferences')}
-                  >
-                    <Bell className="mr-3 h-5 w-5" />
-                    Notification Preferences
-                  </button>
-                  <button
-                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                      activeTab === 'security'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                    onClick={() => setActiveTab('security')}
-                  >
-                    <Shield className="mr-3 h-5 w-5" />
-                    Security Settings
-                  </button>
                 </nav>
               </div>
             </div>
           </Card>
         </div>
         
-        {/* Right column: Active tab content */}
         <div className="md:col-span-3">
           {activeTab === 'profile' && (
             <div className="space-y-6">
-              {/* Basic Information Card */}
               <Card>
                 <CardHeader>
                   <CardTitle>Basic Information</CardTitle>
@@ -290,7 +385,7 @@ const MyProfile = () => {
                       leftIcon={<Mail size={18} />}
                       value={isEditing ? tempProfile.email : profile.email}
                       onChange={handleChange}
-                      disabled={true} // Email is typically not editable
+                      disabled={true}
                       fullWidth
                     />
                     
@@ -334,7 +429,6 @@ const MyProfile = () => {
                 </CardContent>
               </Card>
               
-              {/* Professional Information Card */}
               <Card>
                 <CardHeader>
                   <CardTitle>Professional Information</CardTitle>
@@ -370,20 +464,48 @@ const MyProfile = () => {
                       Education
                     </label>
                     <div className="space-y-3">
-                      {(isEditing ? tempProfile.education : profile.education).map((edu, index) => (
+                      {(isEditing ? tempProfile.education : profile.education).map(edu => (
                         <div key={edu.id} className="p-3 bg-slate-50 rounded-md">
                           <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">{edu.degree}</p>
-                              <p className="text-sm text-slate-600">{edu.institution}, {edu.year}</p>
-                            </div>
+                            {isEditing ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
+                                <Input
+                                  id={`degree-${edu.id}`}
+                                  name="degree"
+                                  label="Degree"
+                                  value={edu.degree}
+                                  onChange={(e) => handleEducationChange(edu.id, 'degree', e.target.value)}
+                                  fullWidth
+                                />
+                                <Input
+                                  id={`institution-${edu.id}`}
+                                  name="institution"
+                                  label="Institution"
+                                  value={edu.institution}
+                                  onChange={(e) => handleEducationChange(edu.id, 'institution', e.target.value)}
+                                  fullWidth
+                                />
+                                <Input
+                                  id={`year-${edu.id}`}
+                                  name="year"
+                                  label="Year"
+                                  value={edu.year}
+                                  onChange={(e) => handleEducationChange(edu.id, 'year', e.target.value)}
+                                  fullWidth
+                                />
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="font-medium">{edu.degree}</p>
+                                <p className="text-sm text-slate-600">{edu.institution}, {edu.year}</p>
+                              </div>
+                            )}
                             {isEditing && (
                               <button 
                                 className="text-red-500 p-1 hover:bg-red-50 rounded-md"
                                 onClick={() => {
-                                  const newEducation = [...tempProfile.education];
-                                  newEducation.splice(index, 1);
-                                  setTempProfile({...tempProfile, education: newEducation});
+                                  const newEducation = tempProfile.education.filter(item => item.id !== edu.id);
+                                  setTempProfile(prev => prev ? ({...prev, education: newEducation}) : null);
                                 }}
                               >
                                 Remove
@@ -404,10 +526,10 @@ const MyProfile = () => {
                               institution: 'Institution Name',
                               year: '2023'
                             };
-                            setTempProfile({
-                              ...tempProfile,
-                              education: [...tempProfile.education, newEdu]
-                            });
+                            setTempProfile(prev => prev ? ({
+                              ...prev,
+                              education: [...prev.education, newEdu]
+                            }) : null);
                           }}
                         >
                           Add Education
@@ -440,38 +562,56 @@ const MyProfile = () => {
                     </div>
                     
                     {isEditing && (
-                      <div className="flex space-x-2">
-                        <input
-                          type="text"
-                          placeholder="Add a skill"
-                          className="flex-1 rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const input = e.target as HTMLInputElement;
+                      <div className="space-y-4">
+                        <div className="flex space-x-2">
+                          <input
+                            type="text"
+                            placeholder="Add a new skill (e.g., 'Project Management')"
+                            className="flex-1 rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const input = e.target as HTMLInputElement;
+                                addSkill(input.value);
+                                input.value = '';
+                              }
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              const input = e.currentTarget.previousSibling as HTMLInputElement;
                               addSkill(input.value);
                               input.value = '';
-                            }
-                          }}
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            const input = e.currentTarget.previousSibling as HTMLInputElement;
-                            addSkill(input.value);
-                            input.value = '';
-                          }}
-                        >
-                          Add
-                        </Button>
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </div>
+
+                        <div>
+                          <h4 className="text-sm font-medium text-slate-700 mb-2">Choose from popular skills:</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {DEFAULT_SKILLS.map(skill => (
+                              <Button
+                                key={skill}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addSkill(skill)}
+                                disabled={tempProfile.skills.includes(skill)}
+                              >
+                                {skill}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
               
-              {/* Learning Achievements Card */}
               <Card>
                 <CardHeader>
                   <CardTitle>Learning Achievements</CardTitle>
@@ -506,166 +646,6 @@ const MyProfile = () => {
                 </CardContent>
               </Card>
             </div>
-          )}
-          
-          {activeTab === 'preferences' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>Manage how you receive notifications</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-base font-medium text-slate-900">Email Notifications</h4>
-                      <p className="text-sm text-slate-600">Receive course updates, assignment reminders, and announcements</p>
-                    </div>
-                    <div className="flex items-center h-6">
-                      <input
-                        id="emailNotifications"
-                        name="emailNotifications"
-                        type="checkbox"
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                        checked={isEditing ? tempProfile.preferences.emailNotifications : profile.preferences.emailNotifications}
-                        onChange={handlePreferenceChange}
-                        disabled={!isEditing}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-base font-medium text-slate-900">SMS Notifications</h4>
-                      <p className="text-sm text-slate-600">Receive urgent updates and alerts via text message</p>
-                    </div>
-                    <div className="flex items-center h-6">
-                      <input
-                        id="smsNotifications"
-                        name="smsNotifications"
-                        type="checkbox"
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                        checked={isEditing ? tempProfile.preferences.smsNotifications : profile.preferences.smsNotifications}
-                        onChange={handlePreferenceChange}
-                        disabled={!isEditing}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-base font-medium text-slate-900">Learning Reminders</h4>
-                      <p className="text-sm text-slate-600">Receive reminders to continue your learning journey</p>
-                    </div>
-                    <div className="flex items-center h-6">
-                      <input
-                        id="learningReminders"
-                        name="learningReminders"
-                        type="checkbox"
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                        checked={isEditing ? tempProfile.preferences.learningReminders : profile.preferences.learningReminders}
-                        onChange={handlePreferenceChange}
-                        disabled={!isEditing}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-base font-medium text-slate-900">Weekly Learning Digest</h4>
-                      <p className="text-sm text-slate-600">Receive a weekly summary of your progress and new courses</p>
-                    </div>
-                    <div className="flex items-center h-6">
-                      <input
-                        id="weeklyDigest"
-                        name="weeklyDigest"
-                        type="checkbox"
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                        checked={isEditing ? tempProfile.preferences.weeklyDigest : profile.preferences.weeklyDigest}
-                        onChange={handlePreferenceChange}
-                        disabled={!isEditing}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          
-          {activeTab === 'security' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>Manage your account security preferences</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between py-3 border-b border-slate-200">
-                    <div>
-                      <h4 className="text-base font-medium text-slate-900">Password</h4>
-                      <p className="text-sm text-slate-600">Last changed {profile.security.lastPasswordChange}</p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleChangePassword}
-                    >
-                      Change
-                    </Button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between py-3 border-b border-slate-200">
-                    <div>
-                      <h4 className="text-base font-medium text-slate-900">Multi-Factor Authentication</h4>
-                      <p className="text-sm text-slate-600">{profile.security.mfaEnabled ? 'Enabled' : 'Not enabled'}</p>
-                    </div>
-                    {!profile.security.mfaEnabled ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleEnableMFA}
-                      >
-                        Enable
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setTempProfile({
-                            ...tempProfile,
-                            security: {
-                              ...tempProfile.security,
-                              mfaEnabled: false
-                            }
-                          });
-                        }}
-                      >
-                        Disable
-                      </Button>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-base font-medium text-slate-900">Login Alerts</h4>
-                      <p className="text-sm text-slate-600">Get notified of new sign-ins to your account</p>
-                    </div>
-                    <div className="flex items-center h-6">
-                      <input
-                        id="loginAlerts"
-                        name="loginAlerts"
-                        type="checkbox"
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                        checked={isEditing ? tempProfile.security.loginAlerts : profile.security.loginAlerts}
-                        onChange={handleSecurityChange}
-                        disabled={!isEditing}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           )}
           
           {isEditing && (

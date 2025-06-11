@@ -40,6 +40,7 @@ import LearningInsights from './pages/learner/learning-insights/LearningInsights
 // Guards
 import AuthGuard from './components/guards/AuthGuard';
 import RoleGuard from './components/guards/RoleGuard';
+import EnrollPage from './pages/learner/courses/EnrollPage';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -111,6 +112,7 @@ function App() {
                 <Route path="/dashboard" element={<LearnerDashboard />} />
                 <Route path="/courses" element={<CourseCatalog />} />
                 <Route path="/courses/:id" element={<CourseView />} />
+                <Route path="/enroll/:courseId" element={<EnrollPage />} />
                 <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonView />} />
                 <Route path="/courses/:courseId/quiz" element={<QuizAttempt />} />
                 <Route path="/certificates" element={<MyCertificates />} />

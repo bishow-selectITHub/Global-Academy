@@ -7,6 +7,17 @@ import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../components/ui/Toaster';
 import { supabase } from '../../../lib/supabase';
 
+interface Lesson {
+  id: string;
+  type: 'video' | 'text' | 'quiz';
+  title: string;
+  video?: any;
+  duration: string;
+  videoUrl: string;
+  completed: boolean;
+  content?: string;
+}
+
 interface Course {
   id: string;
   title: string;
@@ -20,6 +31,8 @@ interface Course {
   enrollments?: {
     count: number;
   }[];
+  lessons: Lesson[];
+  progress: number;
 }
 
 // Mock course data
@@ -133,9 +146,17 @@ const CourseCatalog = () => {
           const course = enrollment.courses;
           const displayEnrolled = course.enrollments?.length || 0;
           
+          // Calculate progress based on completed lessons
+          const completedLessonsCount = course.lessons?.filter((l: Lesson) => l.completed).length || 0;
+          const totalLessonsCount = course.lessons?.length || 0;
+          const calculatedProgress = totalLessonsCount > 0 
+            ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
+            : 0;
+
           return {
             ...course,
             displayEnrolled,
+            progress: calculatedProgress
           } as Course;
         });
 

@@ -201,6 +201,27 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         throw roleError;
       }
 
+      // Create a profile entry in the 'users' table
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: signUpData.user.id,
+          name: name,
+          email: email,
+          phone: '',
+          location: '',
+          avatar: '',
+          department: '',
+          position: '',
+          bio: '',
+          education: JSON.stringify([]),
+          skills: JSON.stringify([]),
+        });
+
+      if (profileError) {
+        throw profileError;
+      }
+
       addToast({
         title: "Registration successful",
         message: "Please check your email to confirm your account, then log in.",

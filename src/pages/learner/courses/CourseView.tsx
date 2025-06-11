@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   Clock, 
   BarChart, 
@@ -17,79 +17,41 @@ import { useToast } from '../../../components/ui/Toaster';
 import { supabase } from '../../../lib/supabase';
 import { useUser } from '../../../contexts/UserContext';
 
-// Mock course data
-// const courseMock = {
-//   id: '1',
-//   title: 'Onboarding Essentials',
-//   description: 'A comprehensive introduction to company policies, procedures, and culture for new employees. This course covers everything you need to know to get started in your new role.',
-//   thumbnail: 'https://images.pexels.com/photos/3184296/pexels-photo-3184296.jpeg?auto=compress&cs=tinysrgb&w=800',
-//   level: 'Beginner',
-//   duration: '2 hours',
-//   instructor: 'Sarah Johnson',
-//   instructorTitle: 'HR Director',
-//   instructorAvatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150',
-//   rating: 4.8,
-//   enrolled: 342,
-//   updatedAt: '2025-03-15',
-//   objectives: [
-//     'Understand company policies and procedures',
-//     'Navigate the organizational structure',
-//     'Access important resources and tools',
-//     'Complete required compliance training',
-//     'Set up your workspace and accounts'
-//   ],
-//   lessons: [
-//     {
-//       id: '1',
-//       title: 'Welcome and Introduction',
-//       duration: '10 min',
-//       type: 'video',
-//       completed: true,
-//     },
-//     {
-//       id: '2',
-//       title: 'Company Policies Overview',
-//       duration: '25 min',
-//       type: 'text',
-//       completed: true,
-//     },
-//     {
-//       id: '3',
-//       title: 'IT Systems and Security',
-//       duration: '20 min',
-//       type: 'video',
-//       completed: false,
-//     },
-//     {
-//       id: '4',
-//       title: 'HR Procedures and Benefits',
-//       duration: '30 min',
-//       type: 'text',
-//       completed: false,
-//     },
-//     {
-//       id: '5',
-//       title: 'Team Structure and Communication',
-//       duration: '15 min',
-//       type: 'video',
-//       completed: false,
-//     },
-//     {
-//       id: '6',
-//       title: 'Knowledge Check',
-//       duration: '15 min',
-//       type: 'quiz',
-//       completed: false,
-//     },
-//   ],
-//   progress: 35,
-// };
+interface Lesson {
+  id: string;
+  type: 'video' | 'text' | 'quiz';
+  title: string;
+  video?: any;
+  duration: string;
+  videoUrl: string;
+  completed: boolean;
+  content?: string;
+}
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  category: string;
+  level: string;
+  duration: string;
+  instructor: string;
+  instructorTitle: string;
+  instructor_avatar: string;
+  rating: number;
+  enrolled: number;
+  updatedAt: string;
+  objectives: string[];
+  lessons: Lesson[];
+  progress: number;
+}
 
 const CourseView = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
-
-  const [course, setCourse] = useState<any>([]);
+  const [course, setCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const {addToast} = useToast();
@@ -97,25 +59,41 @@ const CourseView = () => {
   const {user} = useUser();
   useEffect(()=>{
     const fetchEnrollStatus = async()=>{
+      if (!user) return;
       const {data,error} = await supabase.from("course_enrollments").select("id").eq("user_id",user.id).eq("course_id",id).maybeSingle();
       setIsEnrolled(!!data);
 
       console.log(!!data);
     }
 
-    fetchEnrollStatus();
-  },[isEnrolled])
+    if (user) {
+      fetchEnrollStatus();
+    }
+  },[isEnrolled, id, user]);
 
 
   useEffect(() => {
 
     const fetchCourse = async()=>{
+      if (!user) return;
       try{
 
-        const {data,error} = await supabase.from("courses").select("*").eq("id",id);
+        const {data,error} = await supabase.from("courses").select("*").eq("id",id).single();
         if(error) throw error
-        setCourse(data[0]);
-        console.log(data[0])
+        
+        if (data) {
+          const completedLessonsCount = data.lessons?.filter((l: Lesson) => l.completed).length || 0;
+          const totalLessonsCount = data.lessons?.length || 0;
+          const calculatedProgress = totalLessonsCount > 0 
+            ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
+            : 0;
+
+          setCourse({
+            ...data,
+            progress: calculatedProgress
+          });
+          console.log(data)
+        }
         setIsLoading(false)
       }catch(error:any){
         addToast({
@@ -127,24 +105,23 @@ const CourseView = () => {
         setIsLoading(false);
       }
     }
-    fetchCourse();
-    
-  }, [id]);
-
-  const handleEnroll = async (courseId:string) => {
-    const { error } = await supabase
-      .from("course_enrollments")
-      .insert({
-        user_id: user.id,
-        course_id: courseId
-      })
-  
-    if (error) {
-      console.error("Enrollment failed:", error)
-    } else {
-      console.log("Enrollment successful!")
-      setIsEnrolled(true);
+    if (user) {
+      fetchCourse();
     }
+  }, [id, addToast, user]);
+
+  const handleEnroll = (courseId:string) => {
+    if (!user) {
+      addToast({
+        type: 'error',
+        title: 'Error',
+        message: 'User not logged in.',
+        duration: 3000
+      });
+      return;
+    }
+    // Navigate to EnrollPage.tsx instead of direct enrollment
+    navigate(`/enroll/${courseId}`);
   }
   
 
@@ -198,28 +175,28 @@ const CourseView = () => {
         </div>
         
         <div className="flex items-center">
-          {course.progress === 100 ? (
-            <div className="flex items-center text-green-600 bg-green-50 px-3 py-1 rounded-full">
-              <CheckCircle size={16} className="mr-1" />
-              <span className="text-sm font-medium">Completed</span>
-            </div>
+          {isEnrolled ? (
+            <Link to={`/courses/${course.id}/lessons/${course.lessons?.[0]?.id || ''}`}>
+              <Button
+                leftIcon={<Play size={20} />}
+              >
+                Continue Learning
+              </Button>
+            </Link>
           ) : (
-            <div className="flex items-center">
-              <div className="bg-slate-100 h-2 w-32 rounded-full mr-3">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full" 
-                  style={{ width: `${course.progress}%` }}
-                ></div>
-              </div>
-              <span className="text-sm font-medium text-slate-700">{course.progress}% complete</span>
-            </div>
+            <Button
+              onClick={() => handleEnroll(course.id)}
+              leftIcon={<BookOpen size={20} />}
+            >
+              Enroll Course
+            </Button>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+        <div className="md:col-span-2">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden mb-6">
             <div className="aspect-video bg-slate-200 relative">
               <img 
                 src={course.thumbnail} 
@@ -235,13 +212,13 @@ const CourseView = () => {
             
             <div className="p-6">
               {/* Tabs */}
-              <div className="border-b border-slate-200 mb-6">
+              <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
                 <div className="flex space-x-8">
                   <button
                     className={`pb-4 text-sm font-medium border-b-2 ${
                       activeTab === 'overview'
                         ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
                     }`}
                     onClick={() => setActiveTab('overview')}
                   >
@@ -251,7 +228,7 @@ const CourseView = () => {
                     className={`pb-4 text-sm font-medium border-b-2 ${
                       activeTab === 'curriculum'
                         ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
                     }`}
                     onClick={() => setActiveTab('curriculum')}
                   >
@@ -261,7 +238,7 @@ const CourseView = () => {
                     className={`pb-4 text-sm font-medium border-b-2 ${
                       activeTab === 'resources'
                         ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
                     }`}
                     onClick={() => setActiveTab('resources')}
                   >
@@ -274,34 +251,33 @@ const CourseView = () => {
               {activeTab === 'overview' && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-900 mb-3">About This Course</h2>
-                    <p className="text-slate-600">{course.description}</p>
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">About This Course</h2>
+                    <p className="text-slate-700 dark:text-slate-300">{course.description}</p>
                   </div>
                   
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900 mb-3">What You'll Learn</h3>
-                    <ul className="space-y-2">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">What You'll Learn</h3>
+                    <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300">
                       {course.objectives.map((objective: string, index: number) => (
                         <li key={index} className="flex items-start">
-                          <CheckCircle size={16} className="text-green-500 mr-2 mt-1" />
-                          <span className="text-slate-600">{objective}</span>
+                          <CheckCircle size={16} className="text-green-500 mr-2 mt-1 flex-shrink-0" />
+                          <span>{objective}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
                   
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900 mb-3">Instructor</h3>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">Instructor</h3>
                     <div className="flex items-center">
                       <img 
                         src={course.instructor_avatar}
                         alt={course.instructor}
-                        className="w-12 h-12 rounded-full mr-4 object-contain"
-
+                        className="w-12 h-12 rounded-full mr-4 object-cover"
                       />
                       <div>
-                        <h4 className="font-medium text-slate-900">{course.instructor}</h4>
-                        <p className="text-sm text-slate-600">{course.instructor_title}</p>
+                        <h4 className="font-medium text-slate-900 dark:text-slate-100">{course.instructor}</h4>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">{course.instructorTitle}</p>
                       </div>
                     </div>
                   </div>
@@ -310,36 +286,40 @@ const CourseView = () => {
               
               {activeTab === 'curriculum' && (
                 <div className="space-y-2">
-                  <h2 className="text-xl font-semibold text-slate-900 mb-4">Course Content</h2>
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Course Content</h2>
                   
                   <div className="mb-4 flex justify-between items-center">
-                    <div className="text-sm text-slate-600">
+                    <div className="text-sm text-slate-600 dark:text-slate-400">
                       <span className="font-medium">{course.lessons.length} lessons</span>
                       <span className="mx-2">•</span>
                       <span>{course.duration} total</span>
                     </div>
                     
-                    <button className="text-sm font-medium text-blue-600 hover:text-blue-700">
+                    <button className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
                       Expand All
                     </button>
                   </div>
                   
-                  <div className="border border-slate-200 rounded-lg divide-y divide-slate-200">
-                    {course.lessons.map((lesson: any, index: number) => (
-                      <div key={lesson.id} className="p-4">
+                  <div className="border border-slate-200 rounded-lg divide-y divide-slate-200 dark:border-slate-700 dark:divide-slate-700">
+                    {course.lessons.map((lesson: Lesson, index: number) => (
+                      <Link 
+                        key={lesson.id}
+                        to={`/courses/${course.id}/lessons/${lesson.id}`}
+                        className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                      >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             {lesson.completed ? (
                               <CheckCircle size={18} className="text-green-500 mr-3" />
                             ) : (
-                              <div className="w-5 h-5 flex items-center justify-center rounded-full border border-slate-300 mr-3">
-                                <span className="text-xs text-slate-600">{index + 1}</span>
+                              <div className="w-5 h-5 flex items-center justify-center rounded-full border border-slate-300 dark:border-slate-600 mr-3">
+                                <span className="text-xs text-slate-600 dark:text-slate-400">{index + 1}</span>
                               </div>
                             )}
                             
                             <div>
-                              <h4 className="font-medium text-slate-800">{lesson.title}</h4>
-                              <div className="flex items-center text-xs text-slate-500 mt-1">
+                              <h4 className="font-medium text-slate-800 dark:text-slate-200">{lesson.title}</h4>
+                              <div className="flex items-center text-xs text-slate-500 dark:text-slate-400 mt-1">
                                 {lesson.type === 'video' && <Play size={12} className="mr-1" />}
                                 {lesson.type === 'text' && <FileText size={12} className="mr-1" />}
                                 {lesson.type === 'quiz' && <Award size={12} className="mr-1" />}
@@ -348,13 +328,14 @@ const CourseView = () => {
                             </div>
                           </div>
                           
-                          <Link to={`/courses/${course.id}/lessons/${lesson.id}`}>
-                            <Button size="sm" variant={lesson.completed ? "outline" : "primary"}>
-                              {lesson.completed ? 'Review' : 'Start'}
-                            </Button>
-                          </Link>
+                          <Button size="sm" variant={lesson.completed ? "outline" : "primary"}>
+                            {lesson.completed ? 'Review' : 'Start'}
+                          </Button>
                         </div>
-                      </div>
+                        {!lesson.completed && index > 0 && !course.lessons[index-1].completed && (
+                          <Lock size={14} className="ml-auto text-slate-400 flex-shrink-0" />
+                        )}
+                      </Link>
                     ))}
                   </div>
                 </div>
@@ -362,39 +343,39 @@ const CourseView = () => {
               
               {activeTab === 'resources' && (
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900 mb-4">Course Resources</h2>
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Course Resources</h2>
                   
                   <div className="space-y-3">
                     <a 
                       href="#" 
-                      className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition"
+                      className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition dark:border-slate-700 dark:hover:bg-slate-700"
                     >
-                      <FileText className="h-5 w-5 text-blue-600 mr-3" />
+                      <FileText className="h-5 w-5 text-blue-600 mr-3 dark:text-blue-400" />
                       <div>
-                        <p className="font-medium text-slate-800">Employee Handbook.pdf</p>
-                        <p className="text-xs text-slate-500">2.4 MB • PDF Document</p>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">Employee Handbook.pdf</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">2.4 MB • PDF Document</p>
                       </div>
                     </a>
                     
                     <a 
                       href="#" 
-                      className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition"
+                      className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition dark:border-slate-700 dark:hover:bg-slate-700"
                     >
-                      <FileText className="h-5 w-5 text-blue-600 mr-3" />
+                      <FileText className="h-5 w-5 text-blue-600 mr-3 dark:text-blue-400" />
                       <div>
-                        <p className="font-medium text-slate-800">Company Structure Chart.pdf</p>
-                        <p className="text-xs text-slate-500">1.8 MB • PDF Document</p>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">Company Structure Chart.pdf</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">1.8 MB • PDF Document</p>
                       </div>
                     </a>
                     
                     <a 
                       href="#" 
-                      className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition"
+                      className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition dark:border-slate-700 dark:hover:bg-slate-700"
                     >
-                      <FileText className="h-5 w-5 text-blue-600 mr-3" />
+                      <FileText className="h-5 w-5 text-blue-600 mr-3 dark:text-blue-400" />
                       <div>
-                        <p className="font-medium text-slate-800">IT Security Guidelines.pdf</p>
-                        <p className="text-xs text-slate-500">3.2 MB • PDF Document</p>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">IT Security Guidelines.pdf</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">3.2 MB • PDF Document</p>
                       </div>
                     </a>
                   </div>
@@ -404,114 +385,102 @@ const CourseView = () => {
           </div>
         </div>
         
-        <div className="lg:col-span-1">
+        <div className="md:col-span-1">
           <Card className="sticky top-6">
             <CardContent className="p-6">
-            {
-                    isEnrolled?
-                  
-              <div className="mb-6">
-                <Link to={`/courses/${course.id}/lessons/${course.lessons[0].id}`}>
-                  <Button fullWidth leftIcon={<BookOpen size={18} />}>
-                 
-                    {course.progress > 0 ? 'Continue Course' : 'Start Course'}
-                  </Button>
-                </Link>
-              </div>: <div className="mb-6">
-                
-                  <Button fullWidth leftIcon={<BookOpen size={18} />} onClick={()=>handleEnroll(course.id)}>
+              <Button
+                onClick={() => isEnrolled ? navigate(`/courses/${course.id}/lessons/${course.lessons?.[0]?.id || ''}`) : handleEnroll(course.id)}
+                leftIcon={isEnrolled ? <Play size={18} /> : <BookOpen size={18} />}
+                fullWidth
+              >
+                {isEnrolled ? (course.progress > 0 ? 'Continue Course' : 'Start Course') : 'Enroll Now'}
+              </Button>
 
-                    Enroll Now
-                  </Button>
-              
-              </div>
-}
-              <div className="space-y-4">
+              <div className="space-y-4 mt-6">
                 <div className="flex items-center">
-                  <Clock size={20} className="text-slate-500 mr-3" />
+                  <Clock size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Duration</p>
-                    <p className="text-sm text-slate-600">{course.duration}</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Duration</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{course.duration}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center">
-                  <BarChart size={20} className="text-slate-500 mr-3" />
+                  <BarChart size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Level</p>
-                    <p className="text-sm text-slate-600">{course.level}</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Level</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{course.level}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center">
-                  <Award size={20} className="text-slate-500 mr-3" />
+                  <Award size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Certificate</p>
-                    <p className="text-sm text-slate-600">Upon completion</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Certificate</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Upon completion</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center">
-                  <FileText size={20} className="text-slate-500 mr-3" />
+                  <FileText size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Resources</p>
-                    <p className="text-sm text-slate-600">3 downloadable resources</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Resources</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">3 downloadable resources</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center">
-                  <BookOpen size={20} className="text-slate-500 mr-3" />
+                  <BookOpen size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Lessons</p>
-                    <p className="text-sm text-slate-600">{course.lessons.length} lessons</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Lessons</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{course.lessons.length} lessons</p>
                   </div>
                 </div>
               </div>
 
-              {
-                isEnrolled &&  <div className="mt-6 pt-6 border-t border-slate-200">
-                <h3 className="font-medium text-slate-900 mb-3">Course Progress</h3>
-                <div className="mb-2 flex justify-between items-center">
-                  <span className="text-sm text-slate-600">
-                    {Math.round(course.progress)}% complete
-                  </span>
-                  <span className="text-xs font-medium text-slate-600">
-                    {course.lessons.filter((l: any) => l.completed).length} of {course.lessons.length} lessons
-                  </span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-2 mb-4">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full"
-                    style={{ width: `${course.progress}%` }}
-                  ></div>
-                </div>
+              {isEnrolled &&  (
+                <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                  <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-3">Course Progress</h3>
+                  <div className="mb-2 flex justify-between items-center">
+                    <span className="text-sm text-slate-600 dark:text-slate-400">
+                      {Math.round(course.progress)}% complete
+                    </span>
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                      {course.lessons.filter((l: Lesson) => l.completed).length} of {course.lessons.length} lessons
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2 mb-4 dark:bg-slate-700">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full dark:bg-blue-500"
+                      style={{ width: `${course.progress}%` }}
+                    ></div>
+                  </div>
 
-                <div className="space-y-2">
-                  {course.lessons.map((lesson: any, index: number) => (
-                    <Link 
-                      key={lesson.id}
-                      to={`/courses/${course.id}/lessons/${lesson.id}`}
-                      className="flex items-center px-3 py-2 rounded-md hover:bg-slate-50"
-                    >
-                      {lesson.completed ? (
-                        <CheckCircle size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                      ) : (
-                        <div className="w-4 h-4 flex items-center justify-center rounded-full border border-slate-300 mr-2 flex-shrink-0">
-                          <span className="text-xs text-slate-600">{index + 1}</span>
-                        </div>
-                      )}
-                      <span className="text-sm truncate">
-                        {lesson.title}
-                      </span>
-                      {!lesson.completed && index > 0 && !course.lessons[index-1].completed && (
-                        <Lock size={14} className="ml-auto text-slate-400 flex-shrink-0" />
-                      )}
-                    </Link>
-                  ))}
+                  <div className="space-y-2">
+                    {course.lessons.map((lesson: Lesson, index: number) => (
+                      <Link 
+                        key={lesson.id}
+                        to={`/courses/${course.id}/lessons/${lesson.id}`}
+                        className="flex items-center px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700"
+                      >
+                        {lesson.completed ? (
+                          <CheckCircle size={16} className="text-green-500 dark:text-green-400 mr-2 flex-shrink-0" />
+                        ) : (
+                          <div className="w-4 h-4 flex items-center justify-center rounded-full border border-slate-300 dark:border-slate-600 mr-2 flex-shrink-0">
+                            <span className="text-xs text-slate-600 dark:text-slate-400">{index + 1}</span>
+                          </div>
+                        )}
+                        <span className="text-sm truncate text-slate-700 dark:text-slate-300">
+                          {lesson.title}
+                        </span>
+                        {!lesson.completed && index > 0 && !course.lessons[index-1].completed && (
+                          <Lock size={14} className="ml-auto text-slate-400 flex-shrink-0" />
+                        )}
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              }
-             
+              )}
             </CardContent>
           </Card>
         </div>

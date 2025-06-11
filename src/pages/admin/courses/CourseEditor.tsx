@@ -24,8 +24,8 @@ interface CourseFormData {
   isActive: boolean;
   instructor: string;
   instructorTitle: string;
-  instructorAvatar: File | null;
-  instructorAvatarUrl: string;
+  instructor_avatar: File | null;
+  instructor_avatarUrl: string;
   objectives: string[];
   category: 'Technology' | 'Food' | 'Education' | 'Travel' | 'Life Lessons' | 'Others';
   lessons: {
@@ -35,6 +35,7 @@ interface CourseFormData {
     type: 'video' | 'text' | 'quiz';
     video?: File | null;
     videoUrl?: string;
+    content?: string;
     completed: boolean;
   }[];
 }
@@ -55,8 +56,8 @@ const CourseEditor = () => {
     isActive: true,
     instructor: '',
     instructorTitle: '',
-    instructorAvatar: null,
-    instructorAvatarUrl: '',
+    instructor_avatar: null,
+    instructor_avatarUrl: '',
     objectives: [],
     category: 'Education',
     lessons: []
@@ -91,8 +92,8 @@ const CourseEditor = () => {
             isActive: course.is_active,
             instructor: course.instructor,
             instructorTitle: course.instructor_title,
-            instructorAvatar: null,
-            instructorAvatarUrl: course.instructor_avatar || '',
+            instructor_avatar: null,
+            instructor_avatarUrl: course.instructor_avatar || '',
             objectives: course.objectives || [],
             category: course.category as 'Technology' | 'Food' | 'Education' | 'Travel' | 'Life Lessons' | 'Others',
             lessons: course.lessons || []
@@ -151,7 +152,7 @@ const CourseEditor = () => {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'thumbnail' | 'video' | 'instructorAvatar') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'thumbnail' | 'video' | 'instructor_avatar') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -202,7 +203,7 @@ const CourseEditor = () => {
 
     try {
       let thumbUrl = formData.thumbnailUrl;
-      let instructorAvatarUrl = formData.instructorAvatarUrl;
+      let instructor_avatarUrl = formData.instructor_avatarUrl;
 
       // Upload thumbnail if a new file is selected
       if (formData.thumbnail) {
@@ -219,17 +220,17 @@ const CourseEditor = () => {
       }
 
       // Upload instructor avatar if a new file is selected
-      if (formData.instructorAvatar) {
-        const avatarPath = `avatars/${Date.now()}_${formData.instructorAvatar.name}`;
+      if (formData.instructor_avatar) {
+        const avatarPath = `avatars/${Date.now()}_${formData.instructor_avatar.name}`;
         const { data: avatarData, error: avatarError } = await supabase.storage
           .from('course-assets')
-          .upload(avatarPath, formData.instructorAvatar);
+          .upload(avatarPath, formData.instructor_avatar);
         if (avatarError) throw avatarError;
         const { data: avatarUrlData } = supabase
           .storage
           .from('course-assets')
           .getPublicUrl(avatarPath);
-        instructorAvatarUrl = avatarUrlData.publicUrl;
+        instructor_avatarUrl = avatarUrlData.publicUrl;
       }
 
       const courseData = {
@@ -241,7 +242,7 @@ const CourseEditor = () => {
         is_active: formData.isActive,
         instructor: formData.instructor,
         instructor_title: formData.instructorTitle,
-        instructor_avatar: instructorAvatarUrl,
+        instructor_avatar: instructor_avatarUrl,
         category: formData.category,
         objectives: formData.objectives,
         lessons: formData.lessons,
@@ -292,6 +293,7 @@ const CourseEditor = () => {
       type: 'text' as const,
       video: null,
       videoUrl: '',
+      content: '',
       completed: false
     };
     
@@ -405,8 +407,8 @@ const CourseEditor = () => {
         }
       }
 
-      if (formData.instructorAvatarUrl) {
-        const avatarPath = formData.instructorAvatarUrl.split('/').pop();
+      if (formData.instructor_avatarUrl) {
+        const avatarPath = formData.instructor_avatarUrl.split('/').pop();
         if (avatarPath) {
           await supabase.storage
             .from('course-assets')
@@ -528,6 +530,7 @@ const CourseEditor = () => {
                   error={errors.title}
                   fullWidth
                   disabled={isLoading}
+                  className='p-2'
                 />
                 
                 <div>
@@ -560,7 +563,7 @@ const CourseEditor = () => {
                         id="thumbnail"
                         accept="image/*"
                         onChange={(e) => handleFileChange(e, 'thumbnail')}
-                        className="hidden"
+                        className="hidden p-2"
                       />
                       <label
                         htmlFor="thumbnail"
@@ -591,6 +594,7 @@ const CourseEditor = () => {
                     value={formData.instructor}
                     onChange={handleChange}
                     fullWidth
+                    className='p-2'
                     disabled={isLoading}
                   />
                   <Input
@@ -598,6 +602,7 @@ const CourseEditor = () => {
                     name="instructorTitle"
                     label="Instructor Title"
                     placeholder="Enter instructor title"
+                    className='p-2'
                     value={formData.instructorTitle}
                     onChange={handleChange}
                     fullWidth
@@ -613,25 +618,25 @@ const CourseEditor = () => {
                     <div className="flex-1">
                       <input
                         type="file"
-                        id="instructorAvatar"
+                        id="instructor_avatar"
                         accept="image/*"
-                        onChange={(e) => handleFileChange(e, 'instructorAvatar')}
+                        onChange={(e) => handleFileChange(e, 'instructor_avatar')}
                         className="hidden"
                       />
                       <label
-                        htmlFor="instructorAvatar"
+                        htmlFor="instructor_avatar"
                         className="flex items-center justify-center w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
                       >
                         <Upload size={16} className="mr-2" />
-                        {formData.instructorAvatar ? 'Change Avatar' : 'Upload Avatar'}
+                        {formData.instructor_avatar ? 'Change Avatar' : 'Upload Avatar'}
                       </label>
                     </div>
-                    {formData.instructorAvatarUrl && (
+                    {formData.instructor_avatarUrl && (
                       <div className="w-20 h-20 relative">
                         <img
-                          src={formData.instructorAvatarUrl}
+                          src={formData.instructor_avatarUrl}
                           alt="Instructor avatar"
-                          className="w-full h-full object-cover rounded-md"
+                          className="w-full h-full object-cover rounded-md object-top"
                         />
                       </div>
                     )}
@@ -644,6 +649,7 @@ const CourseEditor = () => {
                     name="duration"
                     label="Duration"
                     placeholder="e.g., 3 hours, 2 weeks"
+                    className='p-2'
                     value={formData.duration}
                     onChange={handleChange}
                     error={errors.duration}
@@ -658,7 +664,7 @@ const CourseEditor = () => {
                     <select
                       id="level"
                       name="level"
-                      className="w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
+                      className="w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100 p-2"
                       value={formData.level}
                       onChange={handleChange}
                       disabled={isLoading}
@@ -677,7 +683,7 @@ const CourseEditor = () => {
                   <select
                     id="category"
                     name="category"
-                    className="w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
+                    className="p-2 w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
                     value={formData.category}
                     onChange={handleChange}
                     disabled={isLoading}
@@ -695,8 +701,9 @@ const CourseEditor = () => {
                   <input
                     id="isActive"
                     name="isActive"
+              
                     type="checkbox"
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600 rounded"
+                    className="p-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600 rounded"
                     checked={formData.isActive}
                     onChange={handleChange}
                     disabled={isLoading}
@@ -721,6 +728,7 @@ const CourseEditor = () => {
                         value={objective}
                         onChange={(e) => handleObjectiveChange(index, e.target.value)}
                         placeholder="Enter learning objective"
+                              className='p-2'
                         fullWidth
                       />
                       <Button
@@ -755,12 +763,14 @@ const CourseEditor = () => {
                       <div className="grid grid-cols-2 gap-4">
                         <Input
                           label="Lesson Title"
+                                className='p-2'
                           value={lesson.title}
                           onChange={(e) => handleLessonChange(lesson.id, 'title', e.target.value)}
                           fullWidth
                         />
                         <Input
                           label="Duration"
+                                className='p-2'
                           value={lesson.duration}
                           onChange={(e) => handleLessonChange(lesson.id, 'duration', e.target.value)}
                           placeholder="e.g., 30 min"
@@ -794,7 +804,8 @@ const CourseEditor = () => {
                                 type="file"
                                 accept=".mkv, .mp4"
                                 onChange={(e) => handleLessonVideoChange(lesson.id, e)}
-                                className="hidden"
+                                className="hidden p-2"
+                                 
                                 id={`video-${lesson.id}`}
                               />
                               <label
@@ -811,6 +822,21 @@ const CourseEditor = () => {
                               </div>
                             )}
                           </div>
+                        </div>
+                      )}
+
+                      {lesson.type === 'text' && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                            Lesson Content
+                          </label>
+                          <textarea
+                            value={lesson.content || ''}
+                            onChange={(e) => handleLessonChange(lesson.id, 'content', e.target.value)}
+                            className="p-2 w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
+                            rows={6}
+                            placeholder="Enter the lesson content here..."
+                          />
                         </div>
                       )}
 

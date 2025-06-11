@@ -22,6 +22,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const LearnerLayout = () => {
   const { user, logout } = useUser();
+  console.log(user);
   const { theme, setTheme } = useTheme();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -82,7 +83,7 @@ const LearnerLayout = () => {
                 <div className="flex items-center">
                   <button className="flex items-center">
                     <img
-                      src={user?.profilePicture || "https://via.placeholder.com/40x40.png?text=U"}
+                      src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
                       alt={user?.name}
                       className="h-8 w-8 rounded-full mr-2"
                     />

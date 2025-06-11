@@ -73,12 +73,14 @@ const Login = () => {
           onChange={(e) => setEmail(e.target.value)}
           error={errors.email}
           fullWidth
+          className='p-2'
           autoComplete="email"
         />
 
         <Input
           id="password"
           type="password"
+          className='p-2'
           label="Password"
           leftIcon={<Lock size={18} />}
           placeholder="••••••••"
