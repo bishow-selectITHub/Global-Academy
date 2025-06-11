@@ -21,6 +21,7 @@ import { useToast } from '../../../components/ui/Toaster';
 const lessonsMock = [
   {
     id: '1',
+    content2:"nice",
     courseId: '1',
     title: 'Welcome and Introduction',
     content: `
