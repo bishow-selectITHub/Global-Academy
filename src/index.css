@@ -1,0 +1,232 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* TipTap Rich Text Editor Styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p {
+  margin-bottom: 1em;
+}
+
+.ProseMirror h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 1em 0;
+  color: #1e293b;
+}
+
+.dark .ProseMirror h1 {
+  color: #e2e8f0;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 1em 0;
+  color: #1e293b;
+}
+
+.dark .ProseMirror h2 {
+  color: #e2e8f0;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin: 1em 0;
+  color: #1e293b;
+}
+
+.dark .ProseMirror h3 {
+  color: #e2e8f0;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid #e2e8f0;
+  padding-left: 1em;
+  color: #64748b;
+  margin: 1em 0;
+}
+
+.dark .ProseMirror blockquote {
+  border-left-color: #475569;
+  color: #94a3b8;
+}
+
+.ProseMirror a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.dark .ProseMirror a {
+  color: #60a5fa;
+}
+
+.ProseMirror code {
+  background-color: #f1f5f9;
+  padding: 0.2em 0.4em;
+  border-radius: 0.25em;
+  font-family: monospace;
+}
+
+.dark .ProseMirror code {
+  background-color: #334155;
+  color: #e2e8f0;
+}
+
+.ProseMirror pre {
+  background-color: #f1f5f9;
+  padding: 0.75em;
+  border-radius: 0.25em;
+  font-family: monospace;
+  margin: 1em 0;
+}
+
+.dark .ProseMirror pre {
+  background-color: #334155;
+  color: #e2e8f0;
+}
+
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 1em 0;
+  overflow: hidden;
+}
+
+.ProseMirror table td,
+.ProseMirror table th {
+  border: 2px solid #e2e8f0;
+  padding: 0.5em;
+}
+
+.dark .ProseMirror table td,
+.dark .ProseMirror table th {
+  border-color: #334155;
+}
+
+.ProseMirror .tableWrapper {
+  overflow-x: auto;
+}
+
+.ProseMirror mark {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.dark .ProseMirror mark {
+  background-color: #78350f;
+  color: #fef3c7;
+}
+
+.ProseMirror hr {
+  border: none;
+  border-top: 2px solid #e2e8f0;
+  margin: 2em 0;
+}
+
+.dark .ProseMirror hr {
+  border-top-color: #334155;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
+/* Prose for rendered content */
+.prose {
+  max-width: 65ch;
+  color: #374151;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  color: #1e293b;
+  margin-top: 2em;
+  margin-bottom: 1em;
+  line-height: 1.3;
+}
+
+.prose p, .prose ol, .prose ul {
+  margin-bottom: 1.25em;
+}
+
+.prose ol, .prose ul {
+  padding-left: 1.625em;
+}
+
+.prose li {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose a {
+  color: #3b82f6;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.prose blockquote {
+  font-weight: 500;
+  font-style: italic;
+  color: #1e293b;
+  border-left: 0.25rem solid #e5e7eb;
+  quotes: "\201C""\201D""\2018""\2019";
+  margin-top: 1.6em;
+  margin-bottom: 1.6em;
+  padding-left: 1em;
+}
+
+/* Dark mode for prose */
+.dark .prose {
+  color: #e5e7eb;
+}
+
+.dark .prose h1, 
+.dark .prose h2, 
+.dark .prose h3, 
+.dark .prose h4, 
+.dark .prose h5, 
+.dark .prose h6 {
+  color: #f1f5f9;
+}
+
+.dark .prose a {
+  color: #60a5fa;
+}
+
+.dark .prose blockquote {
+  color: #f1f5f9;
+  border-left-color: #4b5563;
+}
+
+/* Smooth transitions for dark mode */
+* {
+  transition-property: color, background-color, border-color;
+  transition-duration: 200ms;
+  transition-timing-function: ease-out;
+}
