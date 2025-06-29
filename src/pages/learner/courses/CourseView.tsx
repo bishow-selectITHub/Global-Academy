@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { 
-  Clock, 
-  BarChart, 
-  CheckCircle, 
-  Lock, 
-  Play, 
-  FileText, 
-  Users, 
+import {
+  Clock,
+  BarChart,
+  CheckCircle,
+  Lock,
+  Play,
+  FileText,
+  Users,
   Award,
   BookOpen
 } from 'lucide-react';
@@ -24,8 +24,11 @@ interface Lesson {
   video?: any;
   duration: string;
   videoUrl: string;
-  completed: boolean;
   content?: string;
+}
+
+interface UserLesson extends Lesson {
+  completed: boolean;
 }
 
 interface Course {
@@ -43,7 +46,7 @@ interface Course {
   enrolled: number;
   updatedAt: string;
   objectives: string[];
-  lessons: Lesson[];
+  lessons: UserLesson[];
   progress: number;
 }
 
@@ -54,13 +57,13 @@ const CourseView = () => {
   const [course, setCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-  const {addToast} = useToast();
-  const [isEnrolled,setIsEnrolled] = useState(false); 
-  const {user} = useUser();
-  useEffect(()=>{
-    const fetchEnrollStatus = async()=>{
+  const { addToast } = useToast();
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const { user } = useUser();
+  useEffect(() => {
+    const fetchEnrollStatus = async () => {
       if (!user) return;
-      const {data,error} = await supabase.from("course_enrollments").select("id").eq("user_id",user.id).eq("course_id",id).maybeSingle();
+      const { data, error } = await supabase.from("course_enrollments").select("id").eq("user_id", user.id).eq("course_id", id).maybeSingle();
       setIsEnrolled(!!data);
 
       console.log(!!data);
@@ -69,48 +72,70 @@ const CourseView = () => {
     if (user) {
       fetchEnrollStatus();
     }
-  },[isEnrolled, id, user]);
+  }, [isEnrolled, id, user]);
 
 
   useEffect(() => {
+    const fetchCourse = async () => {
+      if (!user || !id) return;
 
-    const fetchCourse = async()=>{
-      if (!user) return;
-      try{
+      setIsLoading(true);
+      try {
+        // First, get the course data
+        const { data: courseData, error: courseError } = await supabase
+          .from('courses')
+          .select('*')
+          .eq('id', id)
+          .single();
 
-        const {data,error} = await supabase.from("courses").select("*").eq("id",id).single();
-        if(error) throw error
-        
-        if (data) {
-          const completedLessonsCount = data.lessons?.filter((l: Lesson) => l.completed).length || 0;
-          const totalLessonsCount = data.lessons?.length || 0;
-          const calculatedProgress = totalLessonsCount > 0 
-            ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
+        if (courseError) throw courseError;
+
+        // Then, get the user's enrollment data for this course
+        const { data: enrollmentData, error: enrollmentError } = await supabase
+          .from('course_enrollments')
+          .select('lessons')
+          .eq('user_id', user.id)
+          .eq('course_id', id)
+          .single();
+
+        if (enrollmentError && enrollmentError.code !== 'PGRST116') { // PGRST116 is "not found"
+          throw enrollmentError;
+        }
+
+        if (courseData) {
+          // Use user's lesson progress if available, otherwise use course lessons with completed: false
+          const userLessons = enrollmentData?.lessons || courseData.lessons.map((lesson: any) => ({
+            ...lesson,
+            completed: false
+          }));
+
+          const completedLessonsCount = userLessons.filter((l: UserLesson) => l.completed).length || 0;
+          const totalLessonsCount = userLessons.length || 0;
+          const calculatedProgress = totalLessonsCount > 0
+            ? Math.round((completedLessonsCount / totalLessonsCount) * 100)
             : 0;
 
           setCourse({
-            ...data,
+            ...courseData,
+            lessons: userLessons,
             progress: calculatedProgress
           });
-          console.log(data)
         }
-        setIsLoading(false)
-      }catch(error:any){
+      } catch (error: any) {
         addToast({
-          title:"Error fetching course",
-          message:error.message,
-          type:'error'
-        })
-      }finally{
+          type: 'error',
+          title: 'Error loading course',
+          message: error.message,
+        });
+      } finally {
         setIsLoading(false);
       }
-    }
-    if (user) {
-      fetchCourse();
-    }
-  }, [id, addToast, user]);
+    };
 
-  const handleEnroll = (courseId:string) => {
+    fetchCourse();
+  }, [id, user, addToast]);
+
+  const handleEnroll = (courseId: string) => {
     if (!user) {
       addToast({
         type: 'error',
@@ -123,7 +148,7 @@ const CourseView = () => {
     // Navigate to EnrollPage.tsx instead of direct enrollment
     navigate(`/enroll/${courseId}`);
   }
-  
+
 
   if (isLoading) {
     return (
@@ -173,7 +198,7 @@ const CourseView = () => {
             </span>
           </div>
         </div>
-        
+
         <div className="flex items-center">
           {isEnrolled ? (
             <Link to={`/courses/${course.id}/lessons/${course.lessons?.[0]?.id || ''}`}>
@@ -198,8 +223,8 @@ const CourseView = () => {
         <div className="md:col-span-2">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden mb-6">
             <div className="aspect-video bg-slate-200 relative">
-              <img 
-                src={course.thumbnail} 
+              <img
+                src={course.thumbnail}
                 alt={course.title}
                 className="w-full h-full object-cover"
               />
@@ -209,44 +234,41 @@ const CourseView = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="p-6">
               {/* Tabs */}
               <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
                 <div className="flex space-x-8">
                   <button
-                    className={`pb-4 text-sm font-medium border-b-2 ${
-                      activeTab === 'overview'
-                        ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
-                    }`}
+                    className={`pb-4 text-sm font-medium border-b-2 ${activeTab === 'overview'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
                     onClick={() => setActiveTab('overview')}
                   >
                     Overview
                   </button>
                   <button
-                    className={`pb-4 text-sm font-medium border-b-2 ${
-                      activeTab === 'curriculum'
-                        ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
-                    }`}
+                    className={`pb-4 text-sm font-medium border-b-2 ${activeTab === 'curriculum'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
                     onClick={() => setActiveTab('curriculum')}
                   >
                     Curriculum
                   </button>
                   <button
-                    className={`pb-4 text-sm font-medium border-b-2 ${
-                      activeTab === 'resources'
-                        ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
-                    }`}
+                    className={`pb-4 text-sm font-medium border-b-2 ${activeTab === 'resources'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
                     onClick={() => setActiveTab('resources')}
                   >
                     Resources
                   </button>
                 </div>
               </div>
-              
+
               {/* Tab content */}
               {activeTab === 'overview' && (
                 <div className="space-y-6">
@@ -254,7 +276,7 @@ const CourseView = () => {
                     <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">About This Course</h2>
                     <p className="text-slate-700 dark:text-slate-300">{course.description}</p>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">What You'll Learn</h3>
                     <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300">
@@ -266,11 +288,11 @@ const CourseView = () => {
                       ))}
                     </ul>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">Instructor</h3>
                     <div className="flex items-center">
-                      <img 
+                      <img
                         src={course.instructor_avatar}
                         alt={course.instructor}
                         className="w-12 h-12 rounded-full mr-4 object-cover"
@@ -283,26 +305,26 @@ const CourseView = () => {
                   </div>
                 </div>
               )}
-              
+
               {activeTab === 'curriculum' && (
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Course Content</h2>
-                  
+
                   <div className="mb-4 flex justify-between items-center">
                     <div className="text-sm text-slate-600 dark:text-slate-400">
                       <span className="font-medium">{course.lessons.length} lessons</span>
                       <span className="mx-2">•</span>
                       <span>{course.duration} total</span>
                     </div>
-                    
+
                     <button className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
                       Expand All
                     </button>
                   </div>
-                  
+
                   <div className="border border-slate-200 rounded-lg divide-y divide-slate-200 dark:border-slate-700 dark:divide-slate-700">
-                    {course.lessons.map((lesson: Lesson, index: number) => (
-                      <Link 
+                    {course.lessons.map((lesson: UserLesson, index: number) => (
+                      <Link
                         key={lesson.id}
                         to={`/courses/${course.id}/lessons/${lesson.id}`}
                         className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
@@ -316,7 +338,7 @@ const CourseView = () => {
                                 <span className="text-xs text-slate-600 dark:text-slate-400">{index + 1}</span>
                               </div>
                             )}
-                            
+
                             <div>
                               <h4 className="font-medium text-slate-800 dark:text-slate-200">{lesson.title}</h4>
                               <div className="flex items-center text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -327,12 +349,12 @@ const CourseView = () => {
                               </div>
                             </div>
                           </div>
-                          
+
                           <Button size="sm" variant={lesson.completed ? "outline" : "primary"}>
                             {lesson.completed ? 'Review' : 'Start'}
                           </Button>
                         </div>
-                        {!lesson.completed && index > 0 && !course.lessons[index-1].completed && (
+                        {!lesson.completed && index > 0 && !course.lessons[index - 1].completed && (
                           <Lock size={14} className="ml-auto text-slate-400 flex-shrink-0" />
                         )}
                       </Link>
@@ -340,14 +362,14 @@ const CourseView = () => {
                   </div>
                 </div>
               )}
-              
+
               {activeTab === 'resources' && (
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Course Resources</h2>
-                  
+
                   <div className="space-y-3">
-                    <a 
-                      href="#" 
+                    <a
+                      href="#"
                       className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition dark:border-slate-700 dark:hover:bg-slate-700"
                     >
                       <FileText className="h-5 w-5 text-blue-600 mr-3 dark:text-blue-400" />
@@ -356,9 +378,9 @@ const CourseView = () => {
                         <p className="text-xs text-slate-500 dark:text-slate-400">2.4 MB • PDF Document</p>
                       </div>
                     </a>
-                    
-                    <a 
-                      href="#" 
+
+                    <a
+                      href="#"
                       className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition dark:border-slate-700 dark:hover:bg-slate-700"
                     >
                       <FileText className="h-5 w-5 text-blue-600 mr-3 dark:text-blue-400" />
@@ -367,9 +389,9 @@ const CourseView = () => {
                         <p className="text-xs text-slate-500 dark:text-slate-400">1.8 MB • PDF Document</p>
                       </div>
                     </a>
-                    
-                    <a 
-                      href="#" 
+
+                    <a
+                      href="#"
                       className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition dark:border-slate-700 dark:hover:bg-slate-700"
                     >
                       <FileText className="h-5 w-5 text-blue-600 mr-3 dark:text-blue-400" />
@@ -384,7 +406,7 @@ const CourseView = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="md:col-span-1">
           <Card className="sticky top-6">
             <CardContent className="p-6">
@@ -404,7 +426,7 @@ const CourseView = () => {
                     <p className="text-sm text-slate-600 dark:text-slate-400">{course.duration}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center">
                   <BarChart size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
                   <div>
@@ -412,7 +434,7 @@ const CourseView = () => {
                     <p className="text-sm text-slate-600 dark:text-slate-400">{course.level}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center">
                   <Award size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
                   <div>
@@ -420,7 +442,7 @@ const CourseView = () => {
                     <p className="text-sm text-slate-600 dark:text-slate-400">Upon completion</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center">
                   <FileText size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
                   <div>
@@ -428,7 +450,7 @@ const CourseView = () => {
                     <p className="text-sm text-slate-600 dark:text-slate-400">3 downloadable resources</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center">
                   <BookOpen size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
                   <div>
@@ -438,7 +460,7 @@ const CourseView = () => {
                 </div>
               </div>
 
-              {isEnrolled &&  (
+              {isEnrolled && (
                 <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
                   <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-3">Course Progress</h3>
                   <div className="mb-2 flex justify-between items-center">
@@ -446,7 +468,7 @@ const CourseView = () => {
                       {Math.round(course.progress)}% complete
                     </span>
                     <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                      {course.lessons.filter((l: Lesson) => l.completed).length} of {course.lessons.length} lessons
+                      {course.lessons.filter((l: UserLesson) => l.completed).length} of {course.lessons.length} lessons
                     </span>
                   </div>
                   <div className="w-full bg-slate-200 rounded-full h-2 mb-4 dark:bg-slate-700">
@@ -457,8 +479,8 @@ const CourseView = () => {
                   </div>
 
                   <div className="space-y-2">
-                    {course.lessons.map((lesson: Lesson, index: number) => (
-                      <Link 
+                    {course.lessons.map((lesson: UserLesson, index: number) => (
+                      <Link
                         key={lesson.id}
                         to={`/courses/${course.id}/lessons/${lesson.id}`}
                         className="flex items-center px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700"
@@ -473,7 +495,7 @@ const CourseView = () => {
                         <span className="text-sm truncate text-slate-700 dark:text-slate-300">
                           {lesson.title}
                         </span>
-                        {!lesson.completed && index > 0 && !course.lessons[index-1].completed && (
+                        {!lesson.completed && index > 0 && !course.lessons[index - 1].completed && (
                           <Lock size={14} className="ml-auto text-slate-400 flex-shrink-0" />
                         )}
                       </Link>

@@ -15,7 +15,6 @@ interface Lesson {
   video?: any;
   duration: string;
   videoUrl: string;
-  completed: boolean;
   content?: string;
 }
 
@@ -101,12 +100,19 @@ const EnrollPage = () => {
 
     setIsLoading(true);
     try {
+      // Initialize lessons with completed: false for the user
+      const userLessons = course.lessons.map(lesson => ({
+        ...lesson,
+        completed: false
+      }));
+
       const { error } = await supabase
         .from('course_enrollments')
         .insert({
           user_id: user.id,
           course_id: course.id,
           enrolled_at: new Date().toISOString(),
+          lessons: userLessons
         });
 
       if (error) throw error;

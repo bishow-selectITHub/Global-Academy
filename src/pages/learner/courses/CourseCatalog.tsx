@@ -14,7 +14,6 @@ interface Lesson {
   video?: any;
   duration: string;
   videoUrl: string;
-  completed: boolean;
   content?: string;
 }
 
@@ -125,15 +124,15 @@ const CourseCatalog = () => {
   const [selectedLevel, setSelectedLevel] = useState('All Levels');
   const [showFilters, setShowFilters] = useState(false);
   const [sortOption, setSortOption] = useState('popular'); // 'popular', 'newest', 'rating'
-  const [isLoading,setIsLoading] = useState(true);
-  const [enrolledCount,setEnrolledCount] = useState(0)
-  const {user} = useUser();
-  const [courses,setCourses] = useState<Course[]>([])
-  const {addToast} = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [enrolledCount, setEnrolledCount] = useState(0)
+  const { user } = useUser();
+  const [courses, setCourses] = useState<Course[]>([])
+  const { addToast } = useToast();
   useEffect(() => {
     const fetchCourses = async () => {
       if (!user) return;
-      
+
       try {
         const { data, error } = await supabase
           .from('course_enrollments')
@@ -145,13 +144,10 @@ const CourseCatalog = () => {
         const enrolledCourses = data.map((enrollment: any) => {
           const course = enrollment.courses;
           const displayEnrolled = course.enrollments?.length || 0;
-          
-          // Calculate progress based on completed lessons
-          const completedLessonsCount = course.lessons?.filter((l: Lesson) => l.completed).length || 0;
-          const totalLessonsCount = course.lessons?.length || 0;
-          const calculatedProgress = totalLessonsCount > 0 
-            ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
-            : 0;
+
+          // For course catalog, we don't need to calculate progress from courses table
+          // Progress will be calculated when user views their enrolled courses
+          const calculatedProgress = 0;
 
           return {
             ...course,
@@ -179,11 +175,11 @@ const CourseCatalog = () => {
 
   // Filter courses based on search query, category, and level
   const filteredCourses = courses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          course.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All Categories' || course.category === selectedCategory;
     const matchesLevel = selectedLevel === 'All Levels' || course.level === selectedLevel;
-    
+
     return matchesSearch && matchesCategory && matchesLevel;
   });
 
@@ -242,7 +238,7 @@ const CourseCatalog = () => {
             </select>
           </div>
         </div>
-        
+
         {showFilters && (
           <div className="bg-white p-4 rounded-lg shadow-md mb-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -310,7 +306,7 @@ const CourseCatalog = () => {
               <CardContent className="p-4 md:p-5 flex flex-col flex-grow">
                 <h3 className="font-semibold text-lg text-slate-900 mb-2 line-clamp-1">{course.title}</h3>
                 <p className="text-slate-600 text-sm mb-4 line-clamp-2 min-h-[2.5rem]">{course.description}</p>
-                
+
                 <div className="flex flex-wrap items-center text-sm text-slate-500 mb-4 gap-2">
                   <div className="flex items-center">
                     <Clock size={16} className="mr-1" />
@@ -325,7 +321,7 @@ const CourseCatalog = () => {
                     <span>{course.displayEnrolled} enrolled</span>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center mb-4">
                   <div className="flex">
                     {Array(5).fill(0).map((_, i) => (
@@ -336,7 +332,7 @@ const CourseCatalog = () => {
                   </div>
                   <span className="text-sm text-slate-600 ml-1">{course.rating?.toFixed(1)}</span>
                 </div>
-                
+
                 <div className="mt-auto">
                   <Link to={`/courses/${course.id}`}>
                     <Button fullWidth>View Course</Button>

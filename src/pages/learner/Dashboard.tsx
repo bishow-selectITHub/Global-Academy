@@ -13,7 +13,6 @@ interface Lesson {
   duration: string;
   type: 'video' | 'text' | 'quiz';
   videoUrl?: string;
-  completed: boolean;
 }
 
 interface Course {
@@ -105,35 +104,41 @@ const LearnerDashboard = () => {
   useEffect(() => {
     const fetchMyCourses = async () => {
       if (!user) return;
-      
+
       try {
         const { data, error } = await supabase
           .from('course_enrollments')
-          .select('courses (*)')
+          .select(`
+            courses (*),
+            lessons
+          `)
           .eq('user_id', user.id);
 
         if (error) throw error;
 
-        const enrolledCourses = (data as unknown as CourseEnrollment[]).map(enrollment => {
+        const enrolledCourses = (data as any[]).map(enrollment => {
           const course = enrollment.courses;
-          // Calculate progress based on completed lessons
-          const completedLessonsCount = course.lessons?.filter((l: Lesson) => l.completed).length || 0;
-          const totalLessonsCount = course.lessons?.length || 0;
-          const calculatedProgress = totalLessonsCount > 0 
-            ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
+          const userLessons = enrollment.lessons || [];
+
+          // Calculate progress based on user's completed lessons
+          const completedLessonsCount = userLessons.filter((l: any) => l.completed).length || 0;
+          const totalLessonsCount = userLessons.length || 0;
+          const calculatedProgress = totalLessonsCount > 0
+            ? Math.round((completedLessonsCount / totalLessonsCount) * 100)
             : 0;
 
           // Find the next incomplete lesson
-          const nextLesson = course.lessons?.find((l: Lesson) => !l.completed)?.title || 'Course Completed';
+          const nextLesson = userLessons.find((l: any) => !l.completed)?.title || 'Course Completed';
 
           return {
             ...course,
             progress: calculatedProgress,
             lastAccessed: '2 days ago', // You might want to store and fetch this from the database
-            nextLesson
+            nextLesson,
+            userLessons // Store user's lesson progress
           };
         });
-      
+
         setMyCourses(enrolledCourses);
       } catch (error: any) {
         addToast({
@@ -141,7 +146,7 @@ const LearnerDashboard = () => {
           message: error.message,
           type: "error",
         });
-      } 
+      }
     };
 
     if (user) {
@@ -174,7 +179,7 @@ const LearnerDashboard = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex justify-between">
@@ -188,7 +193,7 @@ const LearnerDashboard = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex justify-between">
@@ -207,39 +212,39 @@ const LearnerDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <h2 className="text-xl font-semibold text-slate-900 mb-4">Continue Learning</h2>
-          
+
           <div className="space-y-6">
             {myCourses.map(course => (
               <Card key={course.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <div className="sm:flex">
                   <div className="sm:w-1/3 h-48 sm:h-auto">
-                    <img 
-                      src={course.thumbnail} 
+                    <img
+                      src={course.thumbnail}
                       alt={course.title}
                       className="w-full h-full object-cover"
                     />
                   </div>
                   <div className="p-6 sm:w-2/3">
                     <h3 className="text-lg font-semibold text-slate-900 mb-2">{course.title}</h3>
-                    
+
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm text-slate-600">Progress</span>
                         <span className="text-sm font-medium">{course.progress}%</span>
                       </div>
                       <div className="w-full bg-slate-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${course.progress}%` }}
                         ></div>
                       </div>
                     </div>
-                    
+
                     <div className="text-sm text-slate-600 mb-4">
                       <p>Last accessed: {course.lastAccessed}</p>
                       <p>Next: {course.nextLesson}</p>
                     </div>
-                    
+
                     <div className="flex space-x-3">
                       <Link to={`/courses/${course.id}`} className="inline-block">
                         <Button size="sm" variant="primary">
@@ -256,7 +261,7 @@ const LearnerDashboard = () => {
               <div className="text-center py-4 text-slate-500">No courses in progress.</div>
             )}
           </div>
-          
+
           <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-slate-900">All Courses</h2>
@@ -264,13 +269,13 @@ const LearnerDashboard = () => {
                 View All Courses
               </Link>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {fetchedCourses.map(course => (
                 <Card key={course.id} className="overflow-hidden hover:shadow-md transition-shadow">
                   <div className="h-40">
-                    <img 
-                      src={course.thumbnail} 
+                    <img
+                      src={course.thumbnail}
                       alt={course.title}
                       className="w-full h-full object-cover"
                     />
@@ -297,7 +302,7 @@ const LearnerDashboard = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -311,7 +316,7 @@ const LearnerDashboard = () => {
                   <p className="text-xs text-blue-600">You're making good progress!</p>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between mb-1">
@@ -322,7 +327,7 @@ const LearnerDashboard = () => {
                     <div className="bg-blue-600 h-2 rounded-full" style={{ width: '60%' }}></div>
                   </div>
                 </div>
-                
+
                 <div>
                   <div className="flex justify-between mb-1">
                     <span className="text-sm text-slate-600">Monthly Courses</span>
@@ -335,7 +340,7 @@ const LearnerDashboard = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Recent Achievements</CardTitle>
@@ -360,7 +365,7 @@ const LearnerDashboard = () => {
               )}
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Upcoming Deadlines</CardTitle>

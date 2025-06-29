@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardContent, 
-  CardFooter, 
-  CardDescription 
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+  CardDescription
 } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
@@ -36,7 +36,6 @@ interface CourseFormData {
     video?: File | null;
     videoUrl?: string;
     content?: string;
-    completed: boolean;
   }[];
 }
 
@@ -70,7 +69,7 @@ const CourseEditor = () => {
   useEffect(() => {
     const fetchCourse = async () => {
       if (!isEditing) return;
-      
+
       setIsLoading(true);
       try {
         const { data: course, error } = await supabase
@@ -118,26 +117,26 @@ const CourseEditor = () => {
 
   const validateForm = () => {
     const newErrors: Partial<CourseFormData> = {};
-    
+
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
     }
-    
+
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
     }
-    
+
     if (!formData.duration.trim()) {
       newErrors.duration = 'Duration is required';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    
+
     if (type === 'checkbox') {
       const checkbox = e.target as HTMLInputElement;
       setFormData(prev => ({
@@ -159,7 +158,7 @@ const CourseEditor = () => {
     try {
       // Upload file to Supabase Storage
       const filePath = `${type}/${Date.now()}-${file.name}`;
-      
+
       const { data, error } = await supabase.storage
         .from('course-assets')
         .upload(filePath, file);
@@ -294,9 +293,8 @@ const CourseEditor = () => {
       video: null,
       videoUrl: '',
       content: '',
-      completed: false
     };
-    
+
     setFormData(prev => ({
       ...prev,
       lessons: [...prev.lessons, newLesson]
@@ -306,7 +304,7 @@ const CourseEditor = () => {
   const handleLessonChange = (lessonId: string, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      lessons: prev.lessons.map(lesson => 
+      lessons: prev.lessons.map(lesson =>
         lesson.id === lessonId ? { ...lesson, [field]: value } : lesson
       )
     }));
@@ -319,7 +317,7 @@ const CourseEditor = () => {
 
     try {
       const filePath = `lessons/${Date.now()}-${file.name}`;
-      
+
       const { data, error } = await supabase.storage
         .from('course-assets')
         .upload(filePath, file);
@@ -385,9 +383,9 @@ const CourseEditor = () => {
     if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
       // Delete the course from Supabase
       const { error: deleteError } = await supabase
@@ -427,13 +425,13 @@ const CourseEditor = () => {
           }
         }
       }
-      
+
       addToast({
         type: 'success',
         title: 'Course deleted successfully',
         duration: 5000,
       });
-      
+
       // Navigate back to courses list
       navigate('/admin/courses', { replace: true });
     } catch (error) {
@@ -465,7 +463,7 @@ const CourseEditor = () => {
   const handleReorderLesson = (id: string, direction: 'up' | 'down') => {
     const currentIndex = lessons.findIndex(lesson => lesson.id === id);
     if (currentIndex === -1) return;
-    
+
     if (direction === 'up' && currentIndex > 0) {
       const newLessons = [...lessons];
       const temp = newLessons[currentIndex - 1].order;
@@ -487,8 +485,8 @@ const CourseEditor = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => navigate('/admin/courses')}
             leftIcon={<ArrowLeft size={18} />}
           >
@@ -498,10 +496,10 @@ const CourseEditor = () => {
             {isEditing ? 'Edit Course' : 'Create New Course'}
           </h1>
         </div>
-        
+
         {isEditing && (
-          <Button 
-            variant="danger" 
+          <Button
+            variant="danger"
             onClick={handleDeleteCourse}
             leftIcon={<Trash2 size={18} />}
             isLoading={isLoading}
@@ -532,7 +530,7 @@ const CourseEditor = () => {
                   disabled={isLoading}
                   className='p-2'
                 />
-                
+
                 <div>
                   <label htmlFor="description" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Description
@@ -551,7 +549,7 @@ const CourseEditor = () => {
                     <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.description}</p>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Course Thumbnail
@@ -642,7 +640,7 @@ const CourseEditor = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     id="duration"
@@ -656,7 +654,7 @@ const CourseEditor = () => {
                     fullWidth
                     disabled={isLoading}
                   />
-                  
+
                   <div>
                     <label htmlFor="level" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Difficulty Level
@@ -696,12 +694,12 @@ const CourseEditor = () => {
                     <option value="Others">Others</option>
                   </select>
                 </div>
-                
+
                 <div className="flex items-center h-full pt-6">
                   <input
                     id="isActive"
                     name="isActive"
-              
+
                     type="checkbox"
                     className="p-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600 rounded"
                     checked={formData.isActive}
@@ -728,7 +726,7 @@ const CourseEditor = () => {
                         value={objective}
                         onChange={(e) => handleObjectiveChange(index, e.target.value)}
                         placeholder="Enter learning objective"
-                              className='p-2'
+                        className='p-2'
                         fullWidth
                       />
                       <Button
@@ -742,7 +740,7 @@ const CourseEditor = () => {
                   ))}
                   <Button
                     variant="outline"
-                    onClick={(e) => {handleAddObjective(e); }}
+                    onClick={(e) => { handleAddObjective(e); }}
                     leftIcon={<Plus size={16} />}
                   >
                     Add Objective
@@ -763,21 +761,21 @@ const CourseEditor = () => {
                       <div className="grid grid-cols-2 gap-4">
                         <Input
                           label="Lesson Title"
-                                className='p-2'
+                          className='p-2'
                           value={lesson.title}
                           onChange={(e) => handleLessonChange(lesson.id, 'title', e.target.value)}
                           fullWidth
                         />
                         <Input
                           label="Duration"
-                                className='p-2'
+                          className='p-2'
                           value={lesson.duration}
                           onChange={(e) => handleLessonChange(lesson.id, 'duration', e.target.value)}
                           placeholder="e.g., 30 min"
                           fullWidth
                         />
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                           Lesson Type
@@ -805,7 +803,7 @@ const CourseEditor = () => {
                                 accept=".mkv, .mp4"
                                 onChange={(e) => handleLessonVideoChange(lesson.id, e)}
                                 className="hidden p-2"
-                                 
+
                                 id={`video-${lesson.id}`}
                               />
                               <label
@@ -904,7 +902,7 @@ const CourseEditor = () => {
                     <Image size={48} className="text-slate-400 dark:text-slate-500" />
                   </div>
                 )}
-                
+
                 <div>
                   <h3 className="font-semibold text-lg text-slate-800 dark:text-slate-200">
                     {formData.title || 'Course Title'}
@@ -912,7 +910,7 @@ const CourseEditor = () => {
                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                     {formData.description || 'Course description will appear here'}
                   </p>
-                  
+
                   <div className="flex items-center mt-2 text-xs text-slate-500 dark:text-slate-400">
                     <span className="mr-2">{formData.duration || 'Duration'}</span>
                     <span className="mr-2">•</span>

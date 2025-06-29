@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  ArrowRight, 
-  FileText, 
-  Video, 
-  Bookmark, 
+import {
+  ArrowLeft,
+  ArrowRight,
+  FileText,
+  Video,
+  Bookmark,
   MessageSquare,
   CheckCircle,
   Award,
@@ -17,6 +17,7 @@ import Button from '../../../components/ui/Button';
 import { Card, CardContent } from '../../../components/ui/Card';
 import { useToast } from '../../../components/ui/Toaster';
 import { supabase } from '../../../lib/supabase';
+import { useUser } from '../../../contexts/UserContext';
 
 interface Lesson {
   id: string;
@@ -41,7 +42,8 @@ const LessonView = () => {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const navigate = useNavigate();
   const { addToast } = useToast();
-  
+  const { user } = useUser();
+
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [course, setCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,20 +63,39 @@ const LessonView = () => {
 
         if (courseError) throw courseError;
 
+        // Fetch user's enrollment data
+        const { data: enrollmentData, error: enrollmentError } = await supabase
+          .from('course_enrollments')
+          .select('lessons')
+          .eq('user_id', user?.id)
+          .eq('course_id', courseId)
+          .single();
+
+        if (enrollmentError && enrollmentError.code !== 'PGRST116') {
+          throw enrollmentError;
+        }
+
         if (courseData) {
-          const completedLessonsCount = courseData.lessons.filter((l: Lesson) => l.completed).length;
-          const totalLessonsCount = courseData.lessons.length;
-          const calculatedProgress = totalLessonsCount > 0 
-            ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
+          // Use user's lesson progress if available, otherwise use course lessons with completed: false
+          const userLessons = enrollmentData?.lessons || courseData.lessons.map((lesson: any) => ({
+            ...lesson,
+            completed: false
+          }));
+
+          const completedLessonsCount = userLessons.filter((l: Lesson) => l.completed).length;
+          const totalLessonsCount = userLessons.length;
+          const calculatedProgress = totalLessonsCount > 0
+            ? Math.round((completedLessonsCount / totalLessonsCount) * 100)
             : 0;
 
           setCourse({
             ...courseData,
+            lessons: userLessons,
             progress: calculatedProgress
           });
-          
-          // Find the current lesson from the course's lessons array
-          const currentLesson = courseData.lessons.find((l: Lesson) => l.id === lessonId);
+
+          // Find the current lesson from the user's lessons array
+          const currentLesson = userLessons.find((l: Lesson) => l.id === lessonId);
           if (currentLesson) {
             setLesson(currentLesson);
           }
@@ -92,27 +113,28 @@ const LessonView = () => {
     };
 
     fetchCourseAndLesson();
-  }, [courseId, lessonId, addToast]);
+  }, [courseId, lessonId, user, addToast]);
 
   const markAsComplete = async () => {
     try {
-      // Update the lesson's completed status in the course's lessons array
-      const updatedLessons = course?.lessons.map((l: Lesson) => 
+      // Update the lesson's completed status in the user's lessons array
+      const updatedLessons = course?.lessons.map((l: Lesson) =>
         l.id === lessonId ? { ...l, completed: true } : l
       );
 
       // Calculate new progress
       const completedLessonsCount = updatedLessons?.filter((l: Lesson) => l.completed).length || 0;
       const totalLessonsCount = updatedLessons?.length || 0;
-      const newProgress = totalLessonsCount > 0 
-        ? Math.round((completedLessonsCount / totalLessonsCount) * 100) 
+      const newProgress = totalLessonsCount > 0
+        ? Math.round((completedLessonsCount / totalLessonsCount) * 100)
         : 0;
 
-      // Update the course in Supabase
+      // Update the user's enrollment in Supabase
       const { error } = await supabase
-        .from('courses')
+        .from('course_enrollments')
         .update({ lessons: updatedLessons })
-        .eq('id', courseId);
+        .eq('user_id', user?.id)
+        .eq('course_id', courseId);
 
       if (error) throw error;
 
@@ -122,11 +144,11 @@ const LessonView = () => {
         message: 'Your progress has been updated',
         duration: 3000
       });
-      
+
       // Update local state
       setLesson(prev => prev ? { ...prev, completed: true } : null);
       setCourse(prev => prev ? { ...prev, lessons: updatedLessons || [], progress: newProgress } : null);
-      
+
       // Find the next lesson
       const currentIndex = course?.lessons.findIndex((l: Lesson) => l.id === lessonId);
       if (currentIndex !== undefined && currentIndex < (course?.lessons.length || 0) - 1) {
@@ -155,7 +177,7 @@ const LessonView = () => {
   // Navigate to previous/next lesson
   const navigateLesson = (direction: 'prev' | 'next') => {
     const currentIndex = course?.lessons.findIndex((l: Lesson) => l.id === lessonId);
-    
+
     if (currentIndex !== undefined) {
       if (direction === 'prev' && currentIndex > 0) {
         const prevLesson = course?.lessons[currentIndex - 1];
@@ -249,7 +271,7 @@ const LessonView = () => {
             {lesson.type === 'text' && lesson.content && (
               <div className="prose dark:prose-invert max-w-none mb-6" dangerouslySetInnerHTML={{ __html: lesson.content }} />
             )}
-            
+
             <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-between">
               <div className="flex space-x-2">
                 <Button
@@ -274,7 +296,7 @@ const LessonView = () => {
                   {showNotes ? 'Hide Notes' : 'Add Notes'}
                 </Button>
               </div>
-              
+
               <div className="flex space-x-3">
                 {lesson.completed ? (
                   <div className="flex items-center text-green-600 dark:text-green-400">
@@ -282,7 +304,7 @@ const LessonView = () => {
                     <span>Completed</span>
                   </div>
                 ) : (
-                  <Button 
+                  <Button
                     onClick={markAsComplete}
                     leftIcon={<CheckCircle size={16} />}
                   >
@@ -291,7 +313,7 @@ const LessonView = () => {
                 )}
               </div>
             </div>
-            
+
             {showNotes && (
               <div className="mt-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
                 <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">My Notes</h3>
@@ -303,9 +325,9 @@ const LessonView = () => {
                   onChange={(e) => setNotes(e.target.value)}
                 ></textarea>
                 <div className="mt-2 flex justify-end">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={handleSaveNotes}
                   >
                     Save Notes
@@ -313,7 +335,7 @@ const LessonView = () => {
                 </div>
               </div>
             )}
-            
+
             <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
               <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-3">Was this lesson helpful?</h3>
               <div className="flex space-x-3">
@@ -353,7 +375,7 @@ const LessonView = () => {
               <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-3">Lesson Resources</h3>
               <div className="space-y-3">
                 {lesson.resources.map((resource: any) => (
-                  <a 
+                  <a
                     key={resource.id}
                     href={resource.url}
                     className="flex items-center p-3 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition"
@@ -398,28 +420,25 @@ const LessonView = () => {
                 <Link
                   key={courseLesson.id}
                   to={`/courses/${courseId}/lessons/${courseLesson.id}`}
-                  className={`flex items-center px-3 py-2 rounded-md ${
-                    courseLesson.id === lessonId
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300'
-                  }`}
+                  className={`flex items-center px-3 py-2 rounded-md ${courseLesson.id === lessonId
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300'
+                    }`}
                 >
                   {courseLesson.completed ? (
                     <CheckCircle size={16} className="text-green-500 dark:text-green-400 mr-2 flex-shrink-0" />
                   ) : (
-                    <div className={`w-4 h-4 flex items-center justify-center rounded-full mr-2 flex-shrink-0 ${
-                      courseLesson.id === lessonId
-                        ? 'border-2 border-blue-500 dark:border-blue-400 text-blue-700 dark:text-blue-400'
-                        : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400'
-                    }`}>
+                    <div className={`w-4 h-4 flex items-center justify-center rounded-full mr-2 flex-shrink-0 ${courseLesson.id === lessonId
+                      ? 'border-2 border-blue-500 dark:border-blue-400 text-blue-700 dark:text-blue-400'
+                      : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400'
+                      }`}>
                       <span className="text-xs">{course.lessons.indexOf(courseLesson) + 1}</span>
                     </div>
                   )}
-                  <span className={`text-sm truncate ${
-                    courseLesson.id === lessonId
-                      ? 'font-medium text-blue-700 dark:text-blue-400'
-                      : 'text-slate-700 dark:text-slate-300'
-                  }`}>
+                  <span className={`text-sm truncate ${courseLesson.id === lessonId
+                    ? 'font-medium text-blue-700 dark:text-blue-400'
+                    : 'text-slate-700 dark:text-slate-300'
+                    }`}>
                     {courseLesson.title}
                   </span>
                 </Link>
