@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Card,
   CardHeader,
@@ -10,7 +10,7 @@ import {
 } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
-import { Save, ArrowLeft, Trash2, Plus, Image, Edit, FileText, Video, Award, Upload } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, Plus, Image, Edit, FileText, Video, Award, Upload, Loader2, X, Info } from 'lucide-react';
 import { useToast } from '../../../components/ui/Toaster';
 import { supabase } from '../../../lib/supabase';
 
@@ -65,6 +65,10 @@ const CourseEditor = () => {
   const [errors, setErrors] = useState<Partial<CourseFormData>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [lessons, setLessons] = useState<{ id: string; title: string; order: number; type: 'text' | 'video' | 'quiz' }[]>([]);
+  const [expandedLesson, setExpandedLesson] = useState<string | null>(null);
+  const [uploadingLessonId, setUploadingLessonId] = useState<string | null>(null);
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -151,47 +155,29 @@ const CourseEditor = () => {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'thumbnail' | 'video' | 'instructor_avatar') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'thumbnail' | 'instructor_avatar') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (type === 'thumbnail') setThumbnailUploading(true);
+    if (type === 'instructor_avatar') setAvatarUploading(true);
+
     try {
-      // Upload file to Supabase Storage
       const filePath = `${type}/${Date.now()}-${file.name}`;
-
-      const { data, error } = await supabase.storage
-        .from('course-assets')
-        .upload(filePath, file);
-
+      const { data, error } = await supabase.storage.from('course-assets').upload(filePath, file);
       if (error) throw error;
-
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('course-assets')
-        .getPublicUrl(filePath);
-
-      // Update form data
-      setFormData(prev => ({
-        ...prev,
-        [type]: file,
-        [`${type}Url`]: publicUrl
-      }));
-
-      addToast({
-        type: 'success',
-        title: `${type === 'thumbnail' ? 'Thumbnail' : type === 'video' ? 'Video' : 'Avatar'} uploaded successfully`,
-        duration: 3000,
-      });
+      const { data: { publicUrl } } = supabase.storage.from('course-assets').getPublicUrl(filePath);
+      setFormData(prev => ({ ...prev, [type]: file, [`${type}Url`]: publicUrl }));
     } catch (error) {
-      console.error(`Error uploading ${type}:`, error);
-      addToast({
-        type: 'error',
-        title: `Error uploading ${type}`,
-        message: 'Please try again.',
-        duration: 5000,
-      });
+      addToast({ type: 'error', title: `Error uploading ${type}`, message: 'Please try again.' });
+    } finally {
+      if (type === 'thumbnail') setThumbnailUploading(false);
+      if (type === 'instructor_avatar') setAvatarUploading(false);
     }
   };
+
+  const removeThumbnail = () => setFormData(prev => ({ ...prev, thumbnail: null, thumbnailUrl: '' }));
+  const removeAvatar = () => setFormData(prev => ({ ...prev, instructor_avatar: null, instructor_avatarUrl: '' }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,40 +296,25 @@ const CourseEditor = () => {
     }));
   };
 
+  const toggleLesson = (lessonId: string) => {
+    setExpandedLesson(prev => (prev === lessonId ? null : lessonId));
+  };
+
   const handleLessonVideoChange = async (lessonId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault(); // Prevent form submission
     const file = e.target.files?.[0];
     if (!file) return;
-
+    setUploadingLessonId(lessonId);
     try {
       const filePath = `lessons/${Date.now()}-${file.name}`;
-
-      const { data, error } = await supabase.storage
-        .from('course-assets')
-        .upload(filePath, file);
-
+      const { data, error } = await supabase.storage.from('course-assets').upload(filePath, file);
       if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('course-assets')
-        .getPublicUrl(filePath);
-
+      const { data: { publicUrl } } = supabase.storage.from('course-assets').getPublicUrl(filePath);
       handleLessonChange(lessonId, 'video', file);
       handleLessonChange(lessonId, 'videoUrl', publicUrl);
-
-      addToast({
-        type: 'success',
-        title: 'Video uploaded successfully',
-        duration: 3000,
-      });
     } catch (error) {
-      console.error('Error uploading video:', error);
-      addToast({
-        type: 'error',
-        title: 'Error uploading video',
-        message: 'Please try again.',
-        duration: 5000,
-      });
+      addToast({ type: 'error', title: 'Error uploading video', message: 'Please try again.' });
+    } finally {
+      setUploadingLessonId(null);
     }
   };
 
@@ -554,30 +525,39 @@ const CourseEditor = () => {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Course Thumbnail
                   </label>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <input
                         type="file"
                         id="thumbnail"
                         accept="image/*"
                         onChange={(e) => handleFileChange(e, 'thumbnail')}
-                        className="hidden p-2"
+                        className="hidden"
                       />
                       <label
                         htmlFor="thumbnail"
-                        className="flex items-center justify-center w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
+                        className="flex items-center justify-center w-full px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 cursor-pointer transition-colors"
                       >
                         <Upload size={16} className="mr-2" />
                         {formData.thumbnail ? 'Change Thumbnail' : 'Upload Thumbnail'}
+                        {thumbnailUploading && <Loader2 className="ml-2 animate-spin text-white" size={18} />}
                       </label>
                     </div>
                     {formData.thumbnailUrl && (
-                      <div className="w-20 h-20 relative">
+                      <div className="w-20 h-20 relative rounded-md overflow-hidden border border-slate-200 shadow">
                         <img
                           src={formData.thumbnailUrl}
                           alt="Thumbnail preview"
-                          className="w-full h-full object-cover rounded-md"
+                          className="w-full h-full object-cover"
                         />
+                        <button
+                          onClick={removeThumbnail}
+                          className="absolute top-1 right-1 bg-white bg-opacity-80 rounded-full p-1 hover:bg-red-100"
+                          title="Remove"
+                          type="button"
+                        >
+                          <X size={14} className="text-red-500" />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -612,8 +592,8 @@ const CourseEditor = () => {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Instructor Avatar
                   </label>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex-1">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 ">
                       <input
                         type="file"
                         id="instructor_avatar"
@@ -623,19 +603,28 @@ const CourseEditor = () => {
                       />
                       <label
                         htmlFor="instructor_avatar"
-                        className="flex items-center justify-center w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
+                        className="flex items-center justify-center w-full px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 cursor-pointer transition-colors"
                       >
                         <Upload size={16} className="mr-2" />
                         {formData.instructor_avatar ? 'Change Avatar' : 'Upload Avatar'}
+                        {avatarUploading && <Loader2 className="ml-2 animate-spin text-white" size={18} />}
                       </label>
                     </div>
                     {formData.instructor_avatarUrl && (
-                      <div className="w-20 h-20 relative">
+                      <div className="w-20 h-20 relative rounded-full overflow-hidden border border-slate-200 shadow">
                         <img
                           src={formData.instructor_avatarUrl}
                           alt="Instructor avatar"
-                          className="w-full h-full object-cover rounded-md object-top"
+                          className="w-full h-full object-cover"
                         />
+                        <button
+                          onClick={removeAvatar}
+                          className="absolute top-1 right-1 bg-white bg-opacity-80 rounded-full p-1 hover:bg-red-100"
+                          title="Remove"
+                          type="button"
+                        >
+                          <X size={14} className="text-red-500" />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -755,104 +744,130 @@ const CourseEditor = () => {
                 <CardDescription>Add and organize your course content</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {formData.lessons.map((lesson) => (
-                    <div key={lesson.id} className="border rounded-lg p-4 space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <Input
-                          label="Lesson Title"
-                          className='p-2'
-                          value={lesson.title}
-                          onChange={(e) => handleLessonChange(lesson.id, 'title', e.target.value)}
-                          fullWidth
-                        />
-                        <Input
-                          label="Duration"
-                          className='p-2'
-                          value={lesson.duration}
-                          onChange={(e) => handleLessonChange(lesson.id, 'duration', e.target.value)}
-                          placeholder="e.g., 30 min"
-                          fullWidth
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                          Lesson Type
-                        </label>
-                        <select
-                          value={lesson.type}
-                          onChange={(e) => handleLessonChange(lesson.id, 'type', e.target.value)}
-                          className="w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
-                        >
-                          <option value="text">Text</option>
-                          <option value="video">Video</option>
-                          <option value="quiz">Quiz</option>
-                        </select>
-                      </div>
-
-                      {lesson.type === 'video' && (
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                            Lesson Video
-                          </label>
-                          <div className="flex items-center space-x-4">
-                            <div className="flex-1">
-                              <input
-                                type="file"
-                                accept=".mkv, .mp4"
-                                onChange={(e) => handleLessonVideoChange(lesson.id, e)}
-                                className="hidden p-2"
-
-                                id={`video-${lesson.id}`}
-                              />
-                              <label
-                                htmlFor={`video-${lesson.id}`}
-                                className="flex items-center justify-center w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
-                              >
-                                <Upload size={16} className="mr-2" />
-                                {lesson.video ? 'Change Video' : 'Upload Video'}
-                              </label>
-                            </div>
-                            {lesson.videoUrl && (
-                              <div className="w-20 h-20 relative bg-slate-100 dark:bg-slate-700 rounded-md flex items-center justify-center">
-                                <Video size={24} className="text-slate-400" />
-                              </div>
-                            )}
-                          </div>
+                    <div key={lesson.id} className="rounded-lg border shadow-sm bg-white dark:bg-slate-900">
+                      <div
+                        className="flex items-center justify-between px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-t-lg cursor-pointer"
+                        onClick={() => toggleLesson(lesson.id)}
+                      >
+                        <div className="flex items-center gap-2">
+                          {getLessonTypeIcon(lesson.type)}
+                          <span className="font-semibold">{lesson.title || 'Untitled Lesson'}</span>
+                          {lesson.duration && <span className="text-xs text-slate-500 ml-2">{lesson.duration}</span>}
+                          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${lesson.type === 'video' ? 'bg-blue-100 text-blue-700' : lesson.type === 'quiz' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{lesson.type.charAt(0).toUpperCase() + lesson.type.slice(1)}</span>
                         </div>
-                      )}
-
-                      {lesson.type === 'text' && (
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                            Lesson Content
-                          </label>
-                          <textarea
-                            value={lesson.content || ''}
-                            onChange={(e) => handleLessonChange(lesson.id, 'content', e.target.value)}
-                            className="p-2 w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
-                            rows={6}
-                            placeholder="Enter the lesson content here..."
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex justify-end">
                         <Button
+                          size="icon"
                           variant="ghost"
-                          size="sm"
-                          onClick={(e) => { e.preventDefault(); handleDeleteLesson(lesson.id); }}
-                          leftIcon={<Trash2 size={16} />}
+                          onClick={e => { e.stopPropagation(); handleDeleteLesson(lesson.id); }}
+                          title="Remove Lesson"
                         >
-                          Remove Lesson
+                          <Trash2 size={16} />
                         </Button>
                       </div>
+                      {expandedLesson === lesson.id && (
+                        <div className="p-4 space-y-4 border-t dark:border-slate-700">
+                          <div className="grid grid-cols-2 gap-4">
+                            <Input
+                              label="Lesson Title"
+                              className='p-2'
+                              value={lesson.title}
+                              onChange={(e) => handleLessonChange(lesson.id, 'title', e.target.value)}
+                              fullWidth
+                            />
+                            <Input
+                              label="Duration"
+                              className='p-2'
+                              value={lesson.duration}
+                              onChange={(e) => handleLessonChange(lesson.id, 'duration', e.target.value)}
+                              placeholder="e.g., 30 min"
+                              fullWidth
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                              Lesson Type
+                            </label>
+                            <select
+                              value={lesson.type}
+                              onChange={(e) => handleLessonChange(lesson.id, 'type', e.target.value)}
+                              className="w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
+                            >
+                              <option value="text">Text</option>
+                              <option value="video">Video</option>
+                              <option value="quiz">Quiz</option>
+                            </select>
+                          </div>
+                          {lesson.type === 'video' && (
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                Lesson Video
+                              </label>
+                              <div className="flex items-center space-x-4">
+                                <div className="flex-1">
+                                  <input
+                                    type="file"
+                                    accept=".mkv, .mp4"
+                                    onChange={(e) => handleLessonVideoChange(lesson.id, e)}
+                                    className="hidden p-2"
+                                    id={`video-${lesson.id}`}
+                                  />
+                                  <label
+                                    htmlFor={`video-${lesson.id}`}
+                                    className="flex items-center justify-center w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
+                                  >
+                                    <Upload size={16} className="mr-2" />
+                                    {lesson.video ? 'Change Video' : 'Upload Video'}
+                                  </label>
+                                </div>
+                                {uploadingLessonId === lesson.id ? (
+                                  <div className="w-20 h-20 flex items-center justify-center bg-slate-100 dark:bg-slate-700 rounded-md">
+                                    <Loader2 className="animate-spin text-blue-500" size={28} />
+                                  </div>
+                                ) : lesson.videoUrl ? (
+                                  <div className="w-20 h-20 relative bg-slate-100 dark:bg-slate-700 rounded-md flex items-center justify-center">
+                                    <Video size={24} className="text-slate-400" />
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          )}
+                          {lesson.type === 'text' && (
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                Lesson Content
+                              </label>
+                              <textarea
+                                value={lesson.content || ''}
+                                onChange={(e) => handleLessonChange(lesson.id, 'content', e.target.value)}
+                                className="p-2 w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
+                                rows={6}
+                                placeholder="Enter the lesson content here..."
+                              />
+                            </div>
+                          )}
+
+                          {lesson.type === 'quiz' && (
+                            <div className="mt-2">
+                              {isEditing ? (
+                                <Link to={`/admin/courses/${id}/quiz`}>
+                                  <Button variant="outline" leftIcon={<Edit size={16} />}>Build/Edit Quiz</Button>
+                                </Link>
+                              ) : (
+                                <div className="flex items-center gap-2 p-2 rounded-md bg-slate-100 text-slate-500 text-sm">
+                                  <Info size={16} />
+                                  <span>Save the course to create a quiz.</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
-
                   <Button
-                    variant="outline"
+                    variant="primary"
                     onClick={(e) => { e.preventDefault(); handleAddLesson(); }}
                     leftIcon={<Plus size={16} />}
                     fullWidth
@@ -919,6 +934,35 @@ const CourseEditor = () => {
                     <span>{formData.isActive ? 'Active' : 'Inactive'}</span>
                   </div>
                 </div>
+
+                {/* Objectives Preview */}
+                <div className="mt-4">
+                  <h4 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Objectives ({formData.objectives.length})</h4>
+                  <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400">
+                    {formData.objectives.map((objective, idx) => (
+                      <li key={idx}>{objective}</li>
+                    ))}
+                    {formData.objectives.length === 0 && <li>No objectives added yet.</li>}
+                  </ul>
+                </div>
+
+                {/* Lessons Preview */}
+                <div className="mt-4">
+                  <h4 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Lessons ({formData.lessons.length})</h4>
+                  <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400">
+                    {formData.lessons.map((lesson, idx) => (
+                      <li key={lesson.id} className="mb-1">
+                        <span className="font-medium">{lesson.title || `Lesson ${idx + 1}`}</span>
+                        {lesson.duration && <span className="ml-2 text-xs">({lesson.duration})</span>}
+                        <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">{lesson.type}</span>
+                      </li>
+                    ))}
+                    {formData.lessons.length === 0 && <li>No lessons added yet.</li>}
+                  </ul>
+                </div>
+
+                {/* Course Object Preview (for debugging) */}
+
               </CardContent>
             </Card>
           </div>

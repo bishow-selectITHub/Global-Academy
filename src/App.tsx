@@ -20,6 +20,7 @@ import CourseManagement from './pages/admin/courses/CourseManagement';
 import CourseEditor from './pages/admin/courses/CourseEditor';
 import LessonEditor from './pages/admin/courses/LessonEditor';
 import QuizBuilder from './pages/admin/quizzes/QuizBuilder';
+import QuizManagement from './pages/admin/quizzes/QuizManagement';
 import CertificateTemplates from './pages/admin/certificates/CertificateTemplates';
 import UserManagement from './pages/admin/users/UserManagement';
 import AssetManagement from './pages/admin/assets/AssetManagement';
@@ -63,12 +64,12 @@ function App() {
 
   return (
     <ThemeProvider>
-         <ToastProvider>
+      <ToastProvider>
         <Router>
 
-      <UserProvider>
-       
-        
+          <UserProvider>
+
+
             <Routes>
               {/* Auth Routes */}
               <Route element={<AuthLayout />}>
@@ -78,7 +79,7 @@ function App() {
               </Route>
 
               {/* Admin Routes */}
-              <Route 
+              <Route
                 element={
                   <AuthGuard>
                     <RoleGuard allowedRoles={['admin']}>
@@ -92,7 +93,8 @@ function App() {
                 <Route path="/admin/courses/new" element={<CourseEditor />} />
                 <Route path="/admin/courses/:id" element={<CourseEditor />} />
                 <Route path="/admin/courses/:courseId/lessons/:lessonId" element={<LessonEditor />} />
-                <Route path="/admin/quizzes" element={<QuizBuilder />} />
+                <Route path="/admin/quizzes" element={<QuizManagement />} />
+                <Route path="/admin/courses/:courseId/quiz" element={<QuizBuilder />} />
                 <Route path="/admin/certificates" element={<CertificateTemplates />} />
                 <Route path="/admin/users" element={<UserManagement />} />
                 <Route path="/admin/assets" element={<AssetManagement />} />
@@ -100,7 +102,7 @@ function App() {
               </Route>
 
               {/* Learner Routes */}
-              <Route 
+              <Route
                 element={
                   <AuthGuard>
                     <RoleGuard allowedRoles={['learner']}>
@@ -123,12 +125,12 @@ function App() {
               </Route>
 
               {/* Default Route */}
-              <Route path="/" element={<Navigate to="/login\" replace />} />
+              <Route path="/" element={<Navigate to="/login" replace />} />
             </Routes>
-        
-       
-      </UserProvider>
-      </Router>
+
+
+          </UserProvider>
+        </Router>
       </ToastProvider>
     </ThemeProvider>
   );

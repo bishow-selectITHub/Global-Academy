@@ -1,20 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
-import { 
-  Plus, 
-  Trash2, 
-  Save, 
-  CheckCircle, 
-  Circle, 
+import {
+  Plus,
+  Trash2,
+  Save,
+  CheckCircle,
+  Circle,
   ArrowLeft,
   MoveUp,
   MoveDown,
   BookOpen,
-  HelpCircle
+  HelpCircle,
+  Loader2,
+  GripVertical
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { supabase } from '../../../lib/supabase';
+import { useToast } from '../../../components/ui/Toaster';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { DragEndEvent } from '@dnd-kit/core';
 
 // Question types
 type QuestionType = 'multiple-choice' | 'true-false' | 'short-answer' | 'matching';
@@ -49,47 +58,141 @@ interface Quiz {
   isPublished: boolean;
 }
 
+// Props for SortableQuestionItem
+interface SortableQuestionItemProps {
+  id: string;
+  index: number;
+  question: Question;
+  activeQuestionIndex: number | null;
+  setActiveQuestionIndex: (index: number) => void;
+}
+
+// New SortableQuestionItem component
+const SortableQuestionItem = ({ id, index, question, activeQuestionIndex, setActiveQuestionIndex }: SortableQuestionItemProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      className={`p-3 border rounded-md cursor-pointer hover:bg-slate-50 flex items-center justify-between ${activeQuestionIndex === index ? 'border-blue-500 bg-blue-50 shadow-md' : 'border-slate-200'
+        }`}
+    >
+      <div className="flex items-center" onClick={() => setActiveQuestionIndex(index)}>
+        <div {...listeners} className="cursor-grab p-1 mr-2 text-slate-400 hover:text-slate-600">
+          <GripVertical size={18} />
+        </div>
+        <div>
+          <div className="font-medium">Question {index + 1}</div>
+          <div className="text-sm truncate mt-1 text-slate-600">
+            {question.text || <span className="text-slate-400">No question text</span>}
+          </div>
+        </div>
+      </div>
+      <div className="text-sm text-slate-500">{question.points} pts</div>
+    </div>
+  );
+};
+
 const QuizBuilder = () => {
-  // Sample initial quiz data
+  const { courseId } = useParams<{ courseId: string }>();
+  const { addToast } = useToast();
+
   const [quiz, setQuiz] = useState<Quiz>({
-    id: 'q1',
-    title: 'Data Security Fundamentals',
-    description: 'Test your knowledge of basic data security concepts and best practices.',
-    courseId: 'c2',
-    courseName: 'Data Security Fundamentals',
+    id: '',
+    title: '',
+    description: '',
+    courseId: courseId,
+    courseName: '',
     timeLimit: 30,
     passingScore: 70,
-    questions: [
-      {
-        id: 'q1-1',
-        type: 'multiple-choice',
-        text: 'Which of the following is the best practice for password management?',
-        points: 10,
-        options: [
-          { id: 'q1-1-a', text: 'Using the same password for all accounts', isCorrect: false },
-          { id: 'q1-1-b', text: 'Writing passwords down on sticky notes', isCorrect: false },
-          { id: 'q1-1-c', text: 'Using a password manager with unique passwords', isCorrect: true },
-          { id: 'q1-1-d', text: 'Sharing passwords with team members', isCorrect: false },
-        ],
-        explanation: 'Password managers allow you to create and store unique, complex passwords for each account, which is the most secure approach.'
-      },
-      {
-        id: 'q1-2',
-        type: 'true-false',
-        text: 'Multi-factor authentication provides an additional layer of security beyond passwords.',
-        points: 5,
-        options: [
-          { id: 'q1-2-a', text: 'True', isCorrect: true },
-          { id: 'q1-2-b', text: 'False', isCorrect: false },
-        ],
-        explanation: 'Multi-factor authentication requires multiple forms of verification, making unauthorized access more difficult.'
-      }
-    ],
-    isPublished: false
+    questions: [],
+    isPublished: false,
   });
 
+  const [courses, setCourses] = useState<{ id: string; title: string }[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState<number | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  useEffect(() => {
+    const fetchQuizData = async () => {
+      if (!courseId) {
+        addToast({ type: 'error', title: 'No Course ID provided.' });
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const { data: course, error: courseError } = await supabase
+          .from('courses')
+          .select('title')
+          .eq('id', courseId)
+          .single();
+
+        if (courseError) throw new Error(`Failed to fetch course: ${courseError.message}`);
+        if (!course) throw new Error("Course not found");
+
+        const { data: existingQuiz, error: quizError } = await supabase
+          .from('quizes')
+          .select('*')
+          .eq('course_id', courseId)
+          .maybeSingle();
+
+        if (quizError) throw new Error(`Failed to fetch quiz: ${quizError.message}`);
+
+        if (existingQuiz) {
+          setQuiz({
+            id: existingQuiz.id,
+            title: existingQuiz.title || '',
+            description: existingQuiz.description || '',
+            courseId: existingQuiz.course_id,
+            courseName: course.title,
+            timeLimit: existingQuiz.timeLimit ?? 30,
+            passingScore: existingQuiz.passingScore ?? 70,
+            questions: existingQuiz.questions || [],
+            isPublished: existingQuiz.isPublished || false,
+          });
+        } else {
+          setQuiz(prev => ({
+            ...prev,
+            title: `${course.title} Quiz`,
+            description: `A quiz for the course: ${course.title}.`,
+            courseName: course.title,
+          }));
+        }
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error loading quiz data', message: err.message });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchQuizData();
+  }, [courseId, addToast]);
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const { data, error } = await supabase.from('courses').select('id, title');
+        if (error) throw error;
+        setCourses(data || []);
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error loading courses', message: err.message });
+      }
+    };
+    fetchCourses();
+  }, [addToast]);
 
   // Handler for updating quiz info
   const updateQuizInfo = (field: keyof Quiz, value: any) => {
@@ -155,13 +258,13 @@ const QuizBuilder = () => {
     setQuiz((prev) => {
       const updatedQuestions = [...prev.questions];
       const optionId = `q-${Date.now()}-opt-${updatedQuestions[questionIndex].options.length}`;
-      
+
       updatedQuestions[questionIndex].options.push({
         id: optionId,
         text: '',
         isCorrect: false
       });
-      
+
       return {
         ...prev,
         questions: updatedQuestions
@@ -174,7 +277,7 @@ const QuizBuilder = () => {
     setQuiz((prev) => {
       const updatedQuestions = [...prev.questions];
       updatedQuestions[questionIndex].options = updatedQuestions[questionIndex].options.filter((_, i) => i !== optionIndex);
-      
+
       return {
         ...prev,
         questions: updatedQuestions
@@ -190,7 +293,7 @@ const QuizBuilder = () => {
         ...updatedQuestions[questionIndex].options[optionIndex],
         [field]: value
       };
-      
+
       // If setting this option as correct for multiple-choice, make others incorrect
       if (field === 'isCorrect' && value === true && updatedQuestions[questionIndex].type === 'multiple-choice') {
         updatedQuestions[questionIndex].options.forEach((option, i) => {
@@ -199,7 +302,7 @@ const QuizBuilder = () => {
           }
         });
       }
-      
+
       return {
         ...prev,
         questions: updatedQuestions
@@ -209,17 +312,17 @@ const QuizBuilder = () => {
 
   // Handler for moving a question up or down
   const moveQuestion = (index: number, direction: 'up' | 'down') => {
-    if ((direction === 'up' && index === 0) || 
-        (direction === 'down' && index === quiz.questions.length - 1)) {
+    if ((direction === 'up' && index === 0) ||
+      (direction === 'down' && index === quiz.questions.length - 1)) {
       return;
     }
 
     const newIndex = direction === 'up' ? index - 1 : index + 1;
-    
+
     setQuiz((prev) => {
       const updatedQuestions = [...prev.questions];
       [updatedQuestions[index], updatedQuestions[newIndex]] = [updatedQuestions[newIndex], updatedQuestions[index]];
-      
+
       return {
         ...prev,
         questions: updatedQuestions
@@ -234,22 +337,70 @@ const QuizBuilder = () => {
   };
 
   // Handler for saving the quiz
-  const saveQuiz = () => {
-    // In a real app, this would send the quiz data to a backend API
-    console.log('Saving quiz:', quiz);
-    alert('Quiz saved successfully!');
+  const saveQuiz = async (publish = false) => {
+    if (!courseId) {
+      addToast({ type: 'error', title: 'Error', message: 'Course ID is missing.' });
+      return;
+    }
+
+    const quizDataForDb = {
+      course_id: courseId,
+      title: quiz.title,
+      description: quiz.description,
+      timeLimit: quiz.timeLimit,
+      passingScore: quiz.passingScore,
+      questions: quiz.questions,
+      isPublished: publish,
+    };
+
+    try {
+      let response;
+      if (quiz.id) {
+        // Update existing quiz
+        response = await supabase
+          .from('quizes')
+          .update(quizDataForDb)
+          .eq('id', quiz.id)
+          .select()
+          .single();
+      } else {
+        // Insert new quiz
+        response = await supabase
+          .from('quizes')
+          .insert(quizDataForDb)
+          .select()
+          .single();
+      }
+
+      const { data: savedQuiz, error } = response;
+      if (error) throw error;
+
+      setQuiz(prev => ({ ...prev, ...savedQuiz, courseId: savedQuiz.course_id }));
+
+      addToast({
+        type: 'success',
+        title: `Quiz ${publish ? 'Published' : 'Saved'}!`,
+        message: 'Your changes have been saved.'
+      });
+
+    } catch (err: any) {
+      addToast({ type: 'error', title: `Error ${publish ? 'saving' : 'saving'} quiz`, message: err.message });
+    }
   };
 
-  // Handler for publishing the quiz
-  const publishQuiz = () => {
-    setQuiz((prev) => ({
-      ...prev,
-      isPublished: true
-    }));
-    
-    // In a real app, this would make the quiz available to learners
-    alert('Quiz published successfully!');
-  };
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setQuiz((prev) => {
+        const oldIndex = prev.questions.findIndex(q => q.id === active.id);
+        const newIndex = prev.questions.findIndex(q => q.id === over.id);
+        return {
+          ...prev,
+          questions: arrayMove(prev.questions, oldIndex, newIndex),
+        };
+      });
+    }
+  }
 
   // Render the active question editor
   const renderQuestionEditor = () => {
@@ -273,27 +424,27 @@ const QuizBuilder = () => {
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-semibold">Question {activeQuestionIndex + 1}</h3>
           <div className="flex items-center space-x-2">
-            <Button 
-              size="sm" 
-              variant="outline" 
+            <Button
+              size="sm"
+              variant="outline"
               onClick={() => moveQuestion(activeQuestionIndex, 'up')}
               disabled={activeQuestionIndex === 0}
               leftIcon={<MoveUp size={16} />}
             >
               Move Up
             </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
+            <Button
+              size="sm"
+              variant="outline"
               onClick={() => moveQuestion(activeQuestionIndex, 'down')}
               disabled={activeQuestionIndex === quiz.questions.length - 1}
               leftIcon={<MoveDown size={16} />}
             >
               Move Down
             </Button>
-            <Button 
-              size="sm" 
-              variant="danger" 
+            <Button
+              size="sm"
+              variant="danger"
               onClick={() => removeQuestion(activeQuestionIndex)}
               leftIcon={<Trash2 size={16} />}
             >
@@ -348,35 +499,30 @@ const QuizBuilder = () => {
             </label>
             <div className="space-y-3">
               {question.options.map((option, optionIndex) => (
-                <div key={option.id} className="flex items-center space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => updateOption(activeQuestionIndex, optionIndex, 'isCorrect', !option.isCorrect)}
-                    className="flex-shrink-0"
-                  >
-                    {option.isCorrect ? (
-                      <CheckCircle size={20} className="text-green-600" />
-                    ) : (
-                      <Circle size={20} className="text-slate-400" />
-                    )}
+                <div key={option.id} className="flex items-center gap-3 p-2 border rounded-md bg-slate-50">
+                  <button type="button" onClick={() => updateOption(activeQuestionIndex, optionIndex, 'isCorrect', !option.isCorrect)}>
+                    {option.isCorrect ? <CheckCircle size={22} className="text-green-600" /> : <Circle size={22} className="text-slate-400" />}
                   </button>
                   <Input
                     value={option.text}
                     onChange={(e) => updateOption(activeQuestionIndex, optionIndex, 'text', e.target.value)}
                     placeholder={`Option ${optionIndex + 1}`}
                     fullWidth
+                    className="bg-white"
                   />
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => removeOption(activeQuestionIndex, optionIndex)}
                     disabled={question.options.length <= 2}
-                    leftIcon={<Trash2 size={16} />}
-                  />
+                    className="text-red-500 hover:bg-red-50"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
                 </div>
               ))}
             </div>
-            
+
             <div className="mt-3">
               <Button
                 variant="outline"
@@ -419,7 +565,7 @@ const QuizBuilder = () => {
         <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
           <h2 className="text-xl font-bold mb-2">{quiz.title}</h2>
           <p className="text-slate-600 mb-4">{quiz.description}</p>
-          
+
           <div className="flex flex-wrap gap-4 mb-6">
             <div className="bg-slate-100 px-3 py-1 rounded-full text-sm text-slate-700 flex items-center">
               <Clock size={16} className="mr-1" />
@@ -434,7 +580,7 @@ const QuizBuilder = () => {
               {quiz.questions.length} questions
             </div>
           </div>
-          
+
           <div className="space-y-6">
             {quiz.questions.map((question, index) => (
               <div key={question.id} className="border border-slate-200 rounded-md p-4">
@@ -469,12 +615,20 @@ const QuizBuilder = () => {
     );
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Loader2 className="animate-spin text-blue-600" size={48} />
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Quiz Builder</h1>
-          <p className="text-slate-600">Create and manage quizzes for your courses</p>
+          <p className="text-slate-600">Create and manage quizes for your courses</p>
         </div>
         <div className="flex space-x-3">
           {!previewMode && (
@@ -488,15 +642,15 @@ const QuizBuilder = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={saveQuiz}
+                onClick={() => saveQuiz(false)}
                 leftIcon={<Save size={16} />}
               >
                 Save Draft
               </Button>
               <Button
-                onClick={publishQuiz}
+                onClick={() => saveQuiz(true)}
                 leftIcon={<CheckCircle size={16} />}
-                disabled={quiz.questions.length === 0}
+                disabled={quiz.questions?.length === 0}
               >
                 Publish
               </Button>
@@ -518,44 +672,44 @@ const QuizBuilder = () => {
                 <Input
                   id="quiz-title"
                   label="Quiz Title"
-                  value={quiz.title}
+                  value={quiz.title || ''}
                   onChange={(e) => updateQuizInfo('title', e.target.value)}
                   fullWidth
                 />
-                
+
                 <div>
                   <label htmlFor="quiz-description" className="block text-sm font-medium text-slate-700 mb-1">
                     Description
                   </label>
                   <textarea
                     id="quiz-description"
-                    value={quiz.description}
+                    value={quiz.description || ''}
                     onChange={(e) => updateQuizInfo('description', e.target.value)}
                     className="block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     rows={3}
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <Input
                     id="time-limit"
                     label="Time Limit (minutes)"
                     type="number"
-                    value={quiz.timeLimit?.toString() || ''}
-                    onChange={(e) => updateQuizInfo('timeLimit', parseInt(e.target.value) || '')}
+                    value={quiz.timeLimit?.toString() ?? ''}
+                    onChange={(e) => updateQuizInfo('timeLimit', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
                     fullWidth
                   />
-                  
+
                   <Input
                     id="passing-score"
                     label="Passing Score (%)"
                     type="number"
-                    value={quiz.passingScore.toString()}
+                    value={quiz.passingScore?.toString() ?? ''}
                     onChange={(e) => updateQuizInfo('passingScore', parseInt(e.target.value) || 0)}
                     fullWidth
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="course-select" className="block text-sm font-medium text-slate-700 mb-1">
                     Associated Course
@@ -567,49 +721,48 @@ const QuizBuilder = () => {
                     className="block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                   >
                     <option value="">Select a course</option>
-                    <option value="c1">Onboarding Essentials</option>
-                    <option value="c2">Data Security Fundamentals</option>
-                    <option value="c3">Client Communication</option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.title}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="mt-6">
               <CardHeader>
                 <CardTitle>Questions</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {quiz.questions.length > 0 ? (
-                    quiz.questions.map((question, index) => (
-                      <div 
-                        key={question.id}
-                        className={`p-3 border rounded-md cursor-pointer hover:bg-slate-50 ${
-                          activeQuestionIndex === index ? 'border-blue-500 bg-blue-50' : 'border-slate-200'
-                        }`}
-                        onClick={() => setActiveQuestionIndex(index)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="font-medium">Question {index + 1}</div>
-                          <div className="text-sm text-slate-500">{question.points} pts</div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={quiz.questions?.map(q => q.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2">
+                      {quiz.questions?.length > 0 ? (
+                        quiz.questions?.map((question, index) => (
+                          <SortableQuestionItem
+                            key={question.id}
+                            id={question.id}
+                            index={index}
+                            question={question}
+                            activeQuestionIndex={activeQuestionIndex}
+                            setActiveQuestionIndex={setActiveQuestionIndex}
+                          />
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-slate-500">
+                          No questions added yet
                         </div>
-                        <div className="text-sm truncate mt-1">
-                          {question.text || <span className="text-slate-400">No question text</span>}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-4 text-slate-500">
-                      No questions added yet
+                      )}
                     </div>
-                  )}
-                </div>
+                  </SortableContext>
+                </DndContext>
               </CardContent>
               <CardFooter>
-                <Button 
-                  onClick={addQuestion} 
-                  variant="outline" 
+                <Button
+                  onClick={addQuestion}
+                  variant="outline"
                   fullWidth
                   leftIcon={<Plus size={16} />}
                 >
@@ -618,13 +771,13 @@ const QuizBuilder = () => {
               </CardFooter>
             </Card>
           </div>
-          
+
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
                 <CardTitle>
-                  {activeQuestionIndex === null 
-                    ? 'Question Editor' 
+                  {activeQuestionIndex === null
+                    ? 'Question Editor'
                     : `Edit Question ${activeQuestionIndex + 1}`}
                 </CardTitle>
               </CardHeader>

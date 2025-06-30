@@ -15,8 +15,9 @@ const CourseManagement = () => {
   const fetchCourses = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from('courses').select('*');
+      const { data, error } = await supabase.from('courses').select('*,enrollments:course_enrollments(count)');
       if (error) throw error;
+      console.log(data);
       setCourses(data || []);
     } catch (error: any) {
       if (typeof addToast === 'function') {
@@ -41,9 +42,9 @@ const CourseManagement = () => {
   const filteredCourses = courses.filter(course => {
     const matchesSearch = course.title?.toLowerCase().includes(searchQuery.toLowerCase());
     // Filter by is_active status
-    const matchesStatus = selectedStatus === 'All' || 
-                          (selectedStatus === 'Active' && course.is_active) || 
-                          (selectedStatus === 'Draft' && !course.is_active);
+    const matchesStatus = selectedStatus === 'All' ||
+      (selectedStatus === 'Active' && course.is_active) ||
+      (selectedStatus === 'Draft' && !course.is_active);
     return matchesSearch && matchesStatus;
   });
 
@@ -51,7 +52,7 @@ const CourseManagement = () => {
     if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
       return;
     }
-    
+
     setIsLoading(true);
 
     try {
@@ -86,7 +87,7 @@ const CourseManagement = () => {
             if (removeError && removeError.message !== 'The resource was not found') {
               console.warn(`Warning: Could not delete ${filename} from ${folder}:`, removeError);
             } else if (!removeError) {
-                console.log(`Successfully deleted ${filename} from ${folder}`); // For debugging
+              console.log(`Successfully deleted ${filename} from ${folder}`); // For debugging
             }
           } catch (e) {
             console.warn(`Error trying to delete ${filename} from ${folder}:`, e);
@@ -167,8 +168,8 @@ const CourseManagement = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-gray-800">Course Management</h1>
-        <Link 
-          to="/admin/courses/new" 
+        <Link
+          to="/admin/courses/new"
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg inline-flex items-center"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -190,10 +191,10 @@ const CourseManagement = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-gray-500" />
-            <select 
+            <select
               className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
@@ -243,27 +244,26 @@ const CourseManagement = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        course.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span className={`px-2 py-1 text-xs rounded-full ${course.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
                         {course.is_active ? 'Active' : 'Draft'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                      {course.enrolled || 0}
+                      {course.enrollments?.[0]?.count || 0}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                       {course.updated_at ? new Date(course.updated_at).toLocaleDateString() : ''}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
-                        <Link 
+                        <Link
                           to={`/admin/courses/${course.id}`}
                           className="text-blue-600 hover:text-blue-900"
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
-                        <button 
+                        <button
                           onClick={() => handleDeleteCourse(course.id)}
                           className="text-red-600 hover:text-red-900"
                         >

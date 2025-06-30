@@ -9,7 +9,8 @@ import {
   FileText,
   Users,
   Award,
-  BookOpen
+  BookOpen,
+  HelpCircle,
 } from 'lucide-react';
 import { Card, CardContent } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
@@ -50,11 +51,18 @@ interface Course {
   progress: number;
 }
 
+interface Quiz {
+  id: string;
+  title: string;
+  timeLimit: number;
+}
+
 const CourseView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const [course, setCourse] = useState<Course | null>(null);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const { addToast } = useToast();
@@ -76,19 +84,24 @@ const CourseView = () => {
 
 
   useEffect(() => {
-    const fetchCourse = async () => {
+    const fetchCourseAndQuiz = async () => {
       if (!user || !id) return;
 
       setIsLoading(true);
       try {
-        // First, get the course data
-        const { data: courseData, error: courseError } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('id', id)
-          .single();
+        // Fetch course and quiz data in parallel
+        const [courseResult, quizResult] = await Promise.all([
+          supabase.from('courses').select('*').eq('id', id).single(),
+          supabase.from('quizes').select('id, title, timeLimit').eq('course_id', id).maybeSingle(),
+        ]);
 
+        const { data: courseData, error: courseError } = courseResult;
         if (courseError) throw courseError;
+
+        const { data: quizData, error: quizError } = quizResult;
+        if (quizError) throw quizError;
+
+        setQuiz(quizData);
 
         // Then, get the user's enrollment data for this course
         const { data: enrollmentData, error: enrollmentError } = await supabase
@@ -132,7 +145,7 @@ const CourseView = () => {
       }
     };
 
-    fetchCourse();
+    fetchCourseAndQuiz();
   }, [id, user, addToast]);
 
   const handleEnroll = (courseId: string) => {
@@ -290,19 +303,58 @@ const CourseView = () => {
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">Instructor</h3>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Instructor</h3>
                     <div className="flex items-center">
                       <img
-                        src={course.instructor_avatar}
+                        src={course.instructor_avatar || '/path-to-default-avatar.png'}
                         alt={course.instructor}
-                        className="w-12 h-12 rounded-full mr-4 object-cover"
+                        className="h-16 w-16 rounded-full mr-4"
                       />
                       <div>
-                        <h4 className="font-medium text-slate-900 dark:text-slate-100">{course.instructor}</h4>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">{course.instructorTitle}</p>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-200">{course.instructor}</h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{course.instructorTitle}</p>
                       </div>
                     </div>
                   </div>
+
+                  {quiz && (
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Final Quiz</h3>
+                      <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex-grow">
+                          <div className="flex items-center mb-2">
+                            <Award size={20} className="text-amber-500 mr-2" />
+                            <h4 className="font-semibold text-lg text-slate-800 dark:text-slate-100">{quiz.title}</h4>
+                          </div>
+                          <p className="text-slate-600 dark:text-slate-400">
+                            Complete the course to unlock the final quiz and earn your certificate.
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {isEnrolled ? (
+                            course.progress === 100 ? (
+                              <Link to={`/courses/${id}/quiz`}>
+                                <Button variant="primary">Start Quiz</Button>
+                              </Link>
+                            ) : (
+                              <Button variant="primary" disabled title="Complete all lessons to unlock the quiz">
+                                Start Quiz
+                              </Button>
+                            )
+                          ) : (
+                            <Button variant="primary" disabled title="Enroll in the course to take the quiz">
+                              Start Quiz
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {isEnrolled && course.progress !== 100 && (
+                        <p className="text-sm text-slate-500 mt-3">
+                          Your current progress is {course.progress}%. Complete all lessons to take the quiz.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -359,6 +411,31 @@ const CourseView = () => {
                         )}
                       </Link>
                     ))}
+                    {quiz && (
+                      <div
+                        className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm"
+                      >
+                        <div className="flex items-center">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 mr-4">
+                            <HelpCircle size={20} />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-slate-800 dark:text-slate-100">{quiz.title}</h4>
+                            <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mt-1">
+                              <Clock size={14} className="mr-1" />
+                              <span>{quiz.timeLimit} minutes</span>
+                            </div>
+                          </div>
+                        </div>
+                        <Link to={`/courses/${id}/quiz`}>
+                          <Button
+                            variant="primary"
+                          >
+                            Start Quiz
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
