@@ -7,7 +7,11 @@ interface HostLiveSessionProps {
   onBack: () => void;
 }
 
-// Mock data for enrolled users and feedback
+// API Constants
+const SUPABASE_PROJECT_URL = "https://smqnaddacvwwuehxymbr.supabase.co"
+const CREATE_ROOM_ENDPOINT = "https://smqnaddacvwwuehxymbr.supabase.co/functions/v1/create-hms-room"
+const GENERATE_TOKEN_ENDPOINT = "https://smqnaddacvwwuehxymbr.supabase.co/functions/v1/generate-hms-token";
+
 const mockEnrolledUsers = [
   { id: '1', name: 'Alice Johnson', email: 'alice@example.com', progress: 80 },
   { id: '2', name: 'Bob Smith', email: 'bob@example.com', progress: 55 },
@@ -33,7 +37,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   const [loadingEnrolled, setLoadingEnrolled] = useState(true);
   const { addToast } = useToast();
 
-  // Fetch live sessions for this course
   useEffect(() => {
     const fetchSessions = async () => {
       setLoadingSessions(true);
@@ -43,29 +46,45 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         .eq('course_id', course.id)
         .order('start_time', { ascending: false });
       if (error) {
-        addToast && addToast({ type: 'error', title: 'Error', message: 'Could not fetch live sessions.' });
+        addToast?.({ type: 'error', title: 'Error', message: 'Could not fetch live sessions.' });
       } else {
         setSessions(data || []);
       }
       setLoadingSessions(false);
     };
     fetchSessions();
-  }, [course.id, addToast]);
+  }, [course.id]);
 
-  // Fetch enrolled users for this course
   useEffect(() => {
     const fetchEnrolled = async () => {
       setLoadingEnrolled(true);
-      const { data, error } = await supabase
+      const { data: enrollments, error: enrollmentsError } = await supabase
         .from('course_enrollments')
-        .select('user_id, user:users(id, name, email, avatar)')
+        .select('user_id')
         .eq('course_id', course.id);
-      if (error) {
-        console.error(error);
-        addToast && addToast({ type: 'error', title: 'Error', message: 'Could not fetch enrolled users.' });
+      if (enrollmentsError) {
+        console.error(enrollmentsError);
+        addToast?.({ type: 'error', title: 'Error', message: `${enrollmentsError.message} Could not fetch enrolled users.` });
+        setEnrolledUsers([]);
+        setLoadingEnrolled(false);
+        return;
+      }
+      const userIds = enrollments.map(e => e.user_id);
+      if (userIds.length === 0) {
+        setEnrolledUsers([]);
+        setLoadingEnrolled(false);
+        return;
+      }
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, email, avatar')
+        .in('id', userIds);
+      if (usersError) {
+        console.error(usersError);
+        addToast?.({ type: 'error', title: 'Error', message: `${usersError.message} Could not fetch user details.` });
         setEnrolledUsers([]);
       } else {
-        setEnrolledUsers(data || []);
+        setEnrolledUsers(users || []);
       }
       setLoadingEnrolled(false);
     };
@@ -80,28 +99,79 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    // 1. Call backend to create a 100ms room
-    const roomRes = await fetch('/api/create-room', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        roomName: form.roomName,
-        description: form.description,
-      }),
-    });
-    let roomData;
-    try {
-      roomData = await roomRes.json();
-    } catch {
-      roomData = { message: 'No response from server' };
-    }
-    if (!roomRes.ok) {
-      addToast && addToast({ type: 'error', title: 'Error', message: roomData.message || 'Could not create room.' });
+
+    // 1. Get current user's access token
+    const sessionResponse = await supabase.auth.getSession();
+    const accessToken = sessionResponse.data.session?.access_token;
+
+    if (!accessToken) {
+      addToast?.({ type: 'error', title: 'Error', message: 'User not authenticated.' });
       setSubmitting(false);
       return;
     }
-    const realRoomId = roomData.id; // 100ms returns the room id as 'id'
-    // 2. Save to Supabase
+
+    // Add a default room name if not provided
+    const roomNameToSend = form.roomName && form.roomName.trim() !== ''
+      ? form.roomName
+      : `LiveRoom-${Date.now()}`;
+    console.log('Room name being sent:', roomNameToSend);
+
+    // 2. Call Supabase Edge Function to create a 100ms room
+    const roomRes = await fetch(CREATE_ROOM_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ room_name: roomNameToSend }),
+    });
+
+    let roomData;
+    try {
+      const text = await roomRes.text();
+      console.log('100ms API response:', text);
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { error: text };
+      }
+      roomData = data;
+    } catch {
+      roomData = { message: 'No response from server' };
+    }
+
+    if (!roomRes.ok) {
+      addToast?.({ type: 'error', title: 'Error', message: roomData.message || 'Could not create room.' });
+      setSubmitting(false);
+      return;
+    }
+
+    const realRoomId = roomData.id;
+
+    // 3. Generate 100ms token for host (admin)
+    try {
+      const tokenRes = await fetch("https://smqnaddacvwwuehxymbr.supabase.co/functions/v1/generate-hms-token", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          user_id: sessionResponse.data.session?.user.id,
+          room_id: realRoomId,
+          role: 'host',
+        }),
+      });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok) throw new Error(tokenData.error || 'Failed to generate 100ms token');
+      console.log('100ms host token:', tokenData.token || tokenData);
+      addToast?.({ type: 'success', title: 'Host Token Generated', message: 'Ready to join as host.' });
+    } catch (err: any) {
+      addToast?.({ type: 'error', title: 'Error', message: err.message });
+    }
+
+    // 4. Save room info to Supabase DB
     const { error } = await supabase.from('live_sessions').insert({
       course_id: course.id,
       room_id: realRoomId,
@@ -111,35 +181,74 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       description: form.description,
       status: 'scheduled',
     });
+
     setSubmitting(false);
     if (error) {
-      addToast && addToast({ type: 'error', title: 'Error', message: 'Could not schedule live session.' });
+      addToast?.({ type: 'error', title: 'Error', message: 'Could not schedule live session.' });
     } else {
-      addToast && addToast({ type: 'success', title: 'Live session scheduled', message: 'Room created successfully.' });
+      addToast?.({ type: 'success', title: 'Live session scheduled', message: 'Room created successfully.' });
       setForm({ roomName: '', startDate: '', maxParticipants: '', description: '' });
-      // Refresh session list
+
       const { data } = await supabase
         .from('live_sessions')
         .select('*')
         .eq('course_id', course.id)
         .order('start_time', { ascending: false });
+
       setSessions(data || []);
     }
   };
 
+
   const handleCopy = (roomId: string) => {
     navigator.clipboard.writeText(roomId);
-    addToast && addToast({ type: 'info', title: 'Copied', message: 'Room ID copied to clipboard.' });
+    addToast?.({ type: 'info', title: 'Copied', message: 'Room ID copied to clipboard.' });
   };
 
-  // Mock instructor details (replace with real user lookup if available)
+  // Handler for joining a live session as host
+  const handleJoinSession = async (session) => {
+    const sessionResponse = await supabase.auth.getSession();
+    const accessToken = sessionResponse.data.session?.access_token;
+    const user = sessionResponse.data.session?.user;
+
+    if (!user || !accessToken) {
+      addToast?.({ type: 'error', title: 'Error', message: 'You must be logged in to join.' });
+      return;
+    }
+
+    const roomId = session.room_id;
+    const role = "host"; // Host role for the instructor
+
+    try {
+      const res = await fetch(GENERATE_TOKEN_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          user_id: user.id,
+          room_id: roomId,
+          role: role,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate 100ms token');
+      // For now, just log the token
+      console.log('100ms token:', data.token || data);
+      addToast?.({ type: 'success', title: 'Success', message: 'Token generated! Ready to join.' });
+      // TODO: Integrate with 100ms SDK to actually join the room
+    } catch (err) {
+      addToast?.({ type: 'error', title: 'Error', message: err.message });
+    }
+  };
+
   const instructor = course.instructor || 'Dr. Jane Doe';
   const instructorTitle = course.instructor_title || 'Lead Instructor';
   const instructorAvatar = course.instructor_avatar || 'https://ui-avatars.com/api/?name=Jane+Doe';
 
   return (
     <div className="max-w-6xl mx-auto mt-12 bg-white rounded-lg shadow p-8 flex flex-col md:flex-row gap-8">
-      {/* Main Content */}
       <div className="flex-1 min-w-0">
         <button
           className="mb-6 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded"
@@ -147,7 +256,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         >
           ← Back to Courses
         </button>
-        {/* Course Info */}
+
         <div className="flex items-center gap-4 mb-8">
           <img src={instructorAvatar} alt="Instructor" className="w-16 h-16 rounded-full object-cover border" />
           <div>
@@ -156,7 +265,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
             <div className="text-gray-500 text-sm">{instructorTitle}</div>
           </div>
         </div>
-        {/* Enrolled Users */}
+
         <div className="mb-8">
           <div className="font-semibold text-lg mb-2">Enrolled Users</div>
           <div className="overflow-x-auto">
@@ -172,17 +281,17 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   </tr>
                 </thead>
                 <tbody>
-                  {enrolledUsers.map((enroll, idx) => (
-                    <tr key={enroll.user?.id || idx} className="border-t">
+                  {enrolledUsers.map((user, idx) => (
+                    <tr key={user.id || idx} className="border-t">
                       <td className="px-4 py-2">
-                        {enroll.user?.avatar ? (
-                          <img src={enroll.user.avatar} alt={enroll.user.name} className="w-8 h-8 rounded-full object-cover" />
+                        {user.avatar ? (
+                          <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover" />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">?</div>
                         )}
                       </td>
-                      <td className="px-4 py-2">{enroll.user?.name || '-'}</td>
-                      <td className="px-4 py-2">{enroll.user?.email || '-'}</td>
+                      <td className="px-4 py-2">{user.name || '-'}</td>
+                      <td className="px-4 py-2">{user.email || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -190,7 +299,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
             )}
           </div>
         </div>
-        {/* Feedback/Comments */}
+
         <div>
           <div className="font-semibold text-lg mb-2">Feedback & Comments</div>
           <div className="space-y-3">
@@ -204,7 +313,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
           </div>
         </div>
       </div>
-      {/* Sidebar: Schedule & Sessions */}
+
       <div className="w-full md:w-96 flex-shrink-0">
         <div className="mb-8 p-4 bg-blue-50 rounded">
           <div className="font-semibold text-lg mb-2">Schedule a Live Session</div>
@@ -262,6 +371,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
             </button>
           </form>
         </div>
+
         <div>
           <div className="font-semibold text-lg mb-2">Scheduled Live Sessions</div>
           {loadingSessions ? (
@@ -284,6 +394,10 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                       className="ml-2 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs"
                       onClick={() => handleCopy(session.room_id)}
                     >Copy</button>
+                    <button
+                      className="ml-2 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs"
+                      onClick={() => handleJoinSession(session)}
+                    >Join Live Session</button>
                   </div>
                 </div>
               ))}
@@ -295,4 +409,4 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   );
 };
 
-export default HostLiveSession; 
+export default HostLiveSession;

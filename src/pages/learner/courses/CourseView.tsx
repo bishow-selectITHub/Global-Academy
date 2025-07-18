@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect,useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Clock,
@@ -17,6 +17,82 @@ import Button from '../../../components/ui/Button';
 import { useToast } from '../../../components/ui/Toaster';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
+
+import { supabase } from '../../../lib/supabase';
+
+const GENERATE_TOKEN_ENDPOINT = "https://smqnaddacvwwuehxymbr.supabase.co/functions/v1/generate-hms-token";
+
+const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSessions = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('live_sessions')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('start_time', { ascending: false });
+      setSessions(data || []);
+      setLoading(false);
+    };
+    fetchSessions();
+  }, [courseId]);
+
+  const handleJoinSession = async (session: any) => {
+    const sessionResponse = await supabase.auth.getSession();
+    const accessToken = sessionResponse.data.session?.access_token;
+    const user = sessionResponse.data.session?.user;
+
+    if (!user || !accessToken) {
+      alert('You must be logged in to join.');
+      return;
+    }
+
+    try {
+      const res = await fetch(GENERATE_TOKEN_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          user_id: user.id,
+          room_id: session.room_id,
+          role: 'guest', // or whatever your learner role is in 100ms
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate 100ms token');
+      // Use data.token with 100ms SDK to join the room
+      console.log('100ms token:', data.token);
+      alert('Token generated! Ready to join.');
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  if (loading) return <div>Loading live sessions...</div>;
+
+  return (
+    <div>
+      <h3>Live Sessions</h3>
+      {sessions.length === 0 ? (
+        <div>No live sessions scheduled for this course.</div>
+      ) : (
+        sessions.map(session => (
+          <div key={session.id}>
+            <div>{session.room_name} - {new Date(session.start_time).toLocaleString()}</div>
+            <button onClick={() => handleJoinSession(session)}>
+              Join Live Session
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+};
 
 const CourseView = () => {
   const { id } = useParams<{ id: string }>();
