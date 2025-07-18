@@ -61,7 +61,7 @@ const ToastIcon = ({ type }: { type: ToastType }) => {
 };
 
 export const Toaster = () => {
-  const { toasts, removeToast } = useToast?.() || { toasts: [], removeToast: () => {} };
+  const { toasts, removeToast } = useToast?.() || { toasts: [], removeToast: () => { } };
 
   useEffect(() => {
     if (toasts.length > 0) {
@@ -102,7 +102,7 @@ export const Toaster = () => {
           </div>
         </div>
       ))}
-      <style jsx>{`
+      <style>{`
         @keyframes slideInUp {
           from {
             transform: translateY(100%);

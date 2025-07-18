@@ -343,6 +343,19 @@ const QuizBuilder = () => {
       return;
     }
 
+    // Validation: Each question must have exactly one correct answer
+    for (const [idx, question] of quiz.questions.entries()) {
+      const correctCount = question.options.filter(opt => opt.isCorrect).length;
+      if (correctCount !== 1) {
+        addToast({
+          type: 'error',
+          title: 'Validation Error',
+          message: `Question ${idx + 1} must have exactly one correct answer.`
+        });
+        return;
+      }
+    }
+
     const quizDataForDb = {
       course_id: courseId,
       title: quiz.title,

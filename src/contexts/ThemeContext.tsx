@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 
 type ThemeType = 'light' | 'dark';
 
@@ -25,17 +25,17 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   const [theme, setThemeState] = useState<ThemeType>(() => {
     // Check if theme is stored in localStorage
     const savedTheme = localStorage.getItem('gsacademy_theme') as ThemeType | null;
-    
+
     // Check if user prefers dark mode
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
+
     return savedTheme || (prefersDark ? 'dark' : 'light');
   });
 
   // Update localStorage and document class when theme changes
   useEffect(() => {
     localStorage.setItem('gsacademy_theme', theme);
-    
+
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -47,8 +47,13 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     setThemeState(newTheme);
   };
 
+  const value = useMemo(() => ({
+    theme,
+    setTheme
+  }), [theme]);
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

@@ -1,3 +1,5 @@
+
+
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { 
@@ -49,7 +51,7 @@ const LearnerLayout = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
       {/* Top Bar */}
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10 w-full">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -90,7 +92,7 @@ const LearnerLayout = () => {
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mr-1">{user?.name}</span>
                   </button>
                   <button
-                    onClick={logout}
+                    onClick={() => logout()}
                     className="ml-4 p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
                     title="Logout"
                   >
@@ -143,7 +145,7 @@ const LearnerLayout = () => {
               </Link>
             ))}
             <button
-              onClick={logout}
+              onClick={() => logout()}
               className="w-full flex items-center px-3 py-2 rounded-md text-base font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
             >
               <LogOut size={20} className="mr-3" />
@@ -156,7 +158,7 @@ const LearnerLayout = () => {
       <div className="flex-1 flex">
         {/* Left Sidebar - Desktop Only */}
         <aside 
-          className={`hidden md:flex md:flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-300 ${
+          className={`hidden  h-screen fixed   md:flex md:flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-300  ${
             sidebarCollapsed ? 'md:w-20' : 'md:w-64'
           }`}
         >
@@ -194,16 +196,16 @@ const LearnerLayout = () => {
             </nav>
           </div>
 
-          <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+          <div className=" h-52 p-4 border-t border-slate-200 dark:border-slate-700">
             {sidebarCollapsed ? (
               <div className="flex flex-col items-center">
                 <img
-                  src={user?.profilePicture || "https://via.placeholder.com/40x40.png?text=U"}
+                  src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
                   alt={user?.name}
                   className="h-10 w-10 rounded-full mb-2"
                 />
                 <button
-                  onClick={logout}
+                  onClick={() => logout()}
                   className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
                   title="Logout"
                 >
@@ -214,7 +216,7 @@ const LearnerLayout = () => {
               <div>
                 <div className="flex items-center mb-4">
                   <img
-                    src={user?.profilePicture || "https://via.placeholder.com/40x40.png?text=U"}
+                    src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
                     alt={user?.name}
                     className="h-10 w-10 rounded-full mr-3"
                   />
@@ -224,7 +226,7 @@ const LearnerLayout = () => {
                   </div>
                 </div>
                 <button
-                  onClick={logout}
+                  onClick={() => logout()}
                   className="w-full flex items-center px-3 py-2 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                 >
                   <LogOut size={18} className="mr-2" />
@@ -236,7 +238,9 @@ const LearnerLayout = () => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-slate-900 dark:text-slate-100">
+        <main className={`flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-slate-900 dark:text-slate-100  ${
+            sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'
+          }`}>
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <Outlet />
           </div>

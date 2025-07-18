@@ -25,11 +25,11 @@ import CertificateTemplates from './pages/admin/certificates/CertificateTemplate
 import UserManagement from './pages/admin/users/UserManagement';
 import AssetManagement from './pages/admin/assets/AssetManagement';
 import AnalyticsDashboard from './pages/admin/analytics/AnalyticsDashboard';
+import CourseView from './pages/learner/courses/CourseView';
 
 // Learner Pages
 import LearnerDashboard from './pages/learner/Dashboard';
 import CourseCatalog from './pages/learner/courses/CourseCatalog';
-import CourseView from './pages/learner/courses/CourseView';
 import LessonView from './pages/learner/courses/LessonView';
 import QuizAttempt from './pages/learner/quizzes/QuizAttempt';
 import MyCertificates from './pages/learner/certificates/MyCertificates';
@@ -66,10 +66,7 @@ function App() {
     <ThemeProvider>
       <ToastProvider>
         <Router>
-
           <UserProvider>
-
-
             <Routes>
               {/* Auth Routes */}
               <Route element={<AuthLayout />}>
@@ -82,7 +79,7 @@ function App() {
               <Route
                 element={
                   <AuthGuard>
-                    <RoleGuard allowedRoles={['admin']}>
+                    <RoleGuard allowedRoles={['superadmin']}>
                       <AdminLayout />
                     </RoleGuard>
                   </AuthGuard>
@@ -122,6 +119,7 @@ function App() {
                 <Route path="/documents" element={<MyDocuments />} />
                 <Route path="/assets" element={<MyAssets />} />
                 <Route path="/learning-insights" element={<LearningInsights />} />
+                <Route path="/courses/view/:id" element={<CourseView />} />
               </Route>
 
               {/* Default Route */}

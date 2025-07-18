@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { GraduationCap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { useToast } from '../../../components/ui/Toaster';
-import { supabase } from '../../../lib/supabase';
-import { useUser } from '../../../contexts/UserContext';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../store';
 
 interface Lesson {
   id: string;
@@ -23,61 +23,44 @@ interface Course {
   title: string;
   description: string;
   thumbnail: string;
-  category: string;
   level: string;
   duration: string;
-  instructor: string;
-  instructorTitle: string;
-  instructor_avatar: string;
-  rating: number;
-  enrolled: number;
-  updatedAt: string;
-  objectives: string[];
-  lessons: Lesson[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 const EnrollPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const { user } = useUser();
 
-  const [course, setCourse] = useState<Course | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [billingName, setBillingName] = useState(user?.name || '');
-  const [country, setCountry] = useState('');
+  // Defensive check for courses slice
+  const courseSlice = useSelector((state: RootState) => state.courses || { data: [] });
+  const course = courseSlice.data.find((c: any) => c.id === courseId);
 
-  useEffect(() => {
-    const fetchCourse = async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('id', courseId)
-          .single();
+  if (!course) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Course not found</h2>
+        <p className="text-slate-600 mb-6">The course you're looking for doesn't exist or has been removed.</p>
+        <Link to="/courses">
+          <Button>Back to Course Catalog</Button>
+        </Link>
+      </div>
+    );
+  }
 
-        if (error) throw error;
-        setCourse(data);
-      } catch (error: any) {
-        addToast({
-          type: 'error',
-          title: 'Error loading course details',
-          message: error.message,
-          duration: 5000,
-        });
-        navigate('/courses'); // Redirect if course not found or error
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (courseId) {
-      fetchCourse();
-    }
-  }, [courseId, navigate, addToast]);
+  const [billingName, setBillingName] = React.useState(user?.name || '');
+  const [country, setCountry] = React.useState('');
 
   const handleStartFreeTrial = async () => {
+    console.log('handleStartFreeTrial called');
+    console.log('User:', user);
+    console.log('Course:', course);
+    console.log('Billing name:', billingName);
+    console.log('Country:', country);
+
     if (!user) {
       addToast({
         type: 'error',
@@ -100,20 +83,42 @@ const EnrollPage = () => {
 
     setIsLoading(true);
     try {
-      // Initialize lessons with completed: false for the user
-      const userLessons = course.lessons.map(lesson => ({
-        ...lesson,
-        completed: false
-      }));
+      console.log('Checking for existing enrollment...');
+      // Check if user is already enrolled
+      const { data: existingEnrollment, error: checkError } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('course_id', course.id)
+        .single();
 
-      const { error } = await supabase
+      console.log('Existing enrollment check result:', { existingEnrollment, checkError });
+
+      if (existingEnrollment) {
+        addToast({
+          type: 'info',
+          title: 'Already enrolled',
+          message: 'You are already enrolled in this course.',
+          duration: 3000,
+        });
+        navigate(`/courses/${course.id}`);
+        return;
+      }
+
+      console.log('Creating new enrollment...');
+      // Create enrollment with empty lessons array (will be populated later)
+      const { data, error } = await supabase
         .from('course_enrollments')
         .insert({
           user_id: user.id,
           course_id: course.id,
-          enrolled_at: new Date().toISOString(),
-          lessons: userLessons
-        });
+
+          lessons: [],
+
+        })
+        .select();
+
+      console.log('Enrollment result:', { data, error });
 
       if (error) throw error;
 
@@ -124,13 +129,10 @@ const EnrollPage = () => {
         duration: 5000,
       });
 
-      // Navigate to the first lesson of the course
-      if (course.lessons && course.lessons.length > 0) {
-        navigate(`/courses/${course.id}/lessons/${course.lessons[0].id}`);
-      } else {
-        navigate(`/courses/${course.id}`); // Fallback to course view if no lessons
-      }
+      // Navigate to the course view
+      navigate(`/courses/${course.id}`);
     } catch (error: any) {
+      console.error('Enrollment error:', error);
       addToast({
         type: 'error',
         title: 'Enrollment failed',
@@ -174,7 +176,7 @@ const EnrollPage = () => {
           <p className="text-slate-600 dark:text-slate-400 text-sm">All fields are required</p>
         </div>
         <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium">
-          {course.enrolled} already enrolled!
+          Course available!
         </div>
       </div>
 
@@ -220,7 +222,7 @@ const EnrollPage = () => {
                 <Button
                   onClick={handleStartFreeTrial}
                   isLoading={isLoading}
-                  disabled={!billingName || !country}
+                  disabled={false}
                   className="px-8 py-3 text-lg"
                 >
                   Start Free Trial
@@ -240,7 +242,7 @@ const EnrollPage = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-slate-900 dark:text-slate-100">{course.title}</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400">by {course.instructor}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Course</p>
                 <button className="text-blue-600 hover:underline text-sm mt-1">Remove from cart</button>
               </div>
             </div>

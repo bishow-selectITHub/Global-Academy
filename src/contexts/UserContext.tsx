@@ -1,15 +1,16 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/Toaster';
 
 // Types
-export type UserRole = 'admin' | 'learner';
+export type UserRole = 'superadmin' | 'learner';
 
 export interface User {
   id: string;
   name: string;
   email: string;
+  avatar:string;
   role: UserRole;
 }
 
@@ -17,7 +18,7 @@ interface UserContextType {
   user: User | null;
 
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -41,26 +42,26 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  const {addToast} = useToast();
+  const { addToast } = useToast();
 
   useEffect(() => {
     const fetchUser = async () => {
       setIsLoading(true);
       try {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  
+
         if (sessionError) {
           console.error('Error fetching session:', sessionError);
           setIsLoading(false);
           return;
         }
-  
+
         if (sessionData?.session) {
           const { data: userData } = await supabase.auth.getUser();
-  
+
           if (userData?.user) {
             let role: UserRole = 'learner'; // Default role
-  
+
             if (userData.user.user_metadata?.role) {
               role = userData.user.user_metadata.role as UserRole;
             } else {
@@ -71,7 +72,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
                   .select('role')
                   .eq('user_id', userData.user.id)
                   .single();
-  
+
                 if (roleData?.role) {
                   role = roleData.role as UserRole;
                 }
@@ -79,13 +80,15 @@ export const UserProvider = ({ children }: UserProviderProps) => {
                 console.log('Error fetching role from user_roles table:', error);
               }
             }
-  
+
             setUser({
               id: userData.user.id,
               email: userData.user.email || '',
               role: role,
+              avatar: userData.user.user_metadata?.avatar || '',
               name: userData.user.user_metadata?.name || ''
             });
+            console.log(userData.user.user_metadata?.avatar)
           }
         }
       } catch (err) {
@@ -94,7 +97,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         setIsLoading(false);
       }
     };
-  
+
     fetchUser();
   }, [navigate]);
 
@@ -132,10 +135,11 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         name: signInData.user.user_metadata?.name || '',
         email: signInData.user.email || '',
         role,
+        avatar: signInData.user.user_metadata?.avatar || '',
       });
 
       // Navigate based on role
-      if (role === 'admin') {
+      if (role === 'superadmin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
@@ -160,13 +164,13 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         });
         return;
       }
-      
+
       addToast({
         title: "Signed out successfully",
-        message:'success',
-        type:'success'
+        message: 'success',
+        type: 'success'
       });
-      
+
       setUser(null);
       navigate('/login');
     } catch (error) {
@@ -233,7 +237,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       console.error('Registration error:', error);
       addToast({
         title: "Registration error",
-        message:"An error occurred.",
+        message: "An error occurred.",
         type: "error"
       });
       throw error;
@@ -242,15 +246,14 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     }
   };
 
-  const value = {
+  const value = useMemo(() => ({
     user,
-    isLoading,
     login,
     logout,
     register,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin',
-  };
+    isAdmin: user?.role === 'superadmin'
+  }), [user, login, logout, register]);
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 };

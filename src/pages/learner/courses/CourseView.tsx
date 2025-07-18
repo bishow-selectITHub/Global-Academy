@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Clock,
@@ -15,167 +15,38 @@ import {
 import { Card, CardContent } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import { useToast } from '../../../components/ui/Toaster';
-import { supabase } from '../../../lib/supabase';
-import { useUser } from '../../../contexts/UserContext';
-
-interface Lesson {
-  id: string;
-  type: 'video' | 'text' | 'quiz';
-  title: string;
-  video?: any;
-  duration: string;
-  videoUrl: string;
-  content?: string;
-}
-
-interface UserLesson extends Lesson {
-  completed: boolean;
-}
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail: string;
-  category: string;
-  level: string;
-  duration: string;
-  instructor: string;
-  instructorTitle: string;
-  instructor_avatar: string;
-  rating: number;
-  enrolled: number;
-  updatedAt: string;
-  objectives: string[];
-  lessons: UserLesson[];
-  progress: number;
-}
-
-interface Quiz {
-  id: string;
-  title: string;
-  timeLimit: number;
-}
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../store';
 
 const CourseView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-
-  const [course, setCourse] = useState<Course | null>(null);
-  const [quiz, setQuiz] = useState<Quiz | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
   const { addToast } = useToast();
-  const [isEnrolled, setIsEnrolled] = useState(false);
-  const { user } = useUser();
-  useEffect(() => {
-    const fetchEnrollStatus = async () => {
-      if (!user) return;
-      const { data, error } = await supabase.from("course_enrollments").select("id").eq("user_id", user.id).eq("course_id", id).maybeSingle();
-      setIsEnrolled(!!data);
+  const [activeTab, setActiveTab] = useState('overview');
 
-      console.log(!!data);
-    }
+  // Defensive checks for slices
+  const courseSlice = useSelector((state: RootState) => state.courses || { data: [] });
+  const enrollmentSlice = useSelector((state: RootState) => state.enrollments || { data: [] });
+  const quizSlice = useSelector((state: RootState) => state.quizzes || { data: [] });
 
-    if (user) {
-      fetchEnrollStatus();
-    }
-  }, [isEnrolled, id, user]);
+  const course = courseSlice.data.find((c: any) => c.id === id);
+  const enrollment = enrollmentSlice.data.find((e: any) => e.course?.id === id);
+  const quiz = quizSlice.data.find((q: any) => q.course_id === id);
 
-
-  useEffect(() => {
-    const fetchCourseAndQuiz = async () => {
-      if (!user || !id) return;
-
-      setIsLoading(true);
-      try {
-        // Fetch course and quiz data in parallel
-        const [courseResult, quizResult] = await Promise.all([
-          supabase.from('courses').select('*').eq('id', id).single(),
-          supabase.from('quizes').select('id, title, timeLimit').eq('course_id', id).maybeSingle(),
-        ]);
-
-        const { data: courseData, error: courseError } = courseResult;
-        if (courseError) throw courseError;
-
-        const { data: quizData, error: quizError } = quizResult;
-        if (quizError) throw quizError;
-
-        setQuiz(quizData);
-
-        // Then, get the user's enrollment data for this course
-        const { data: enrollmentData, error: enrollmentError } = await supabase
-          .from('course_enrollments')
-          .select('lessons')
-          .eq('user_id', user.id)
-          .eq('course_id', id)
-          .single();
-
-        if (enrollmentError && enrollmentError.code !== 'PGRST116') { // PGRST116 is "not found"
-          throw enrollmentError;
-        }
-
-        if (courseData) {
-          // Use user's lesson progress if available, otherwise use course lessons with completed: false
-          const userLessons = enrollmentData?.lessons || courseData.lessons.map((lesson: any) => ({
-            ...lesson,
-            completed: false
-          }));
-
-          const completedLessonsCount = userLessons.filter((l: UserLesson) => l.completed).length || 0;
-          const totalLessonsCount = userLessons.length || 0;
-          const calculatedProgress = totalLessonsCount > 0
-            ? Math.round((completedLessonsCount / totalLessonsCount) * 100)
-            : 0;
-
-          setCourse({
-            ...courseData,
-            lessons: userLessons,
-            progress: calculatedProgress
-          });
-        }
-      } catch (error: any) {
-        addToast({
-          type: 'error',
-          title: 'Error loading course',
-          message: error.message,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCourseAndQuiz();
-  }, [id, user, addToast]);
+  const quizScore = enrollment?.quizScore;
+  const isEnrolled = !!enrollment;
+  const progress = enrollment?.progress || 0;
+  const userLessons = enrollment?.lessons || course?.lessons || [];
 
   const handleEnroll = (courseId: string) => {
-    if (!user) {
-      addToast({
-        type: 'error',
-        title: 'Error',
-        message: 'User not logged in.',
-        duration: 3000
-      });
-      return;
-    }
-    // Navigate to EnrollPage.tsx instead of direct enrollment
+    addToast({
+      type: 'info',
+      title: 'Redirecting',
+      message: 'Navigating to enrollment page.',
+      duration: 2000
+    });
     navigate(`/enroll/${courseId}`);
-  }
-
-
-  if (isLoading) {
-    return (
-      <div className="animate-pulse">
-        <div className="h-8 bg-slate-200 rounded w-1/4 mb-6"></div>
-        <div className="h-64 bg-slate-200 rounded-lg mb-6"></div>
-        <div className="h-24 bg-slate-200 rounded-lg mb-6"></div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="h-40 bg-slate-200 rounded-lg col-span-2"></div>
-          <div className="h-40 bg-slate-200 rounded-lg"></div>
-        </div>
-      </div>
-    );
-  }
+  };
 
   if (!course) {
     return (
@@ -211,27 +82,18 @@ const CourseView = () => {
             </span>
           </div>
         </div>
-
         <div className="flex items-center">
           {isEnrolled ? (
-            <Link to={`/courses/${course.id}/lessons/${course.lessons?.[0]?.id || ''}`}>
-              <Button
-                leftIcon={<Play size={20} />}
-              >
-                Continue Learning
-              </Button>
+            <Link to={`/courses/${course.id}/lessons/${userLessons?.[0]?.id || ''}`}>
+              <Button leftIcon={<Play size={20} />}>Continue Learning</Button>
             </Link>
           ) : (
-            <Button
-              onClick={() => handleEnroll(course.id)}
-              leftIcon={<BookOpen size={20} />}
-            >
+            <Button onClick={() => handleEnroll(course.id)} leftIcon={<BookOpen size={20} />}>
               Enroll Course
             </Button>
           )}
         </div>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="md:col-span-2">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden mb-6">
@@ -247,7 +109,6 @@ const CourseView = () => {
                 </button>
               </div>
             </div>
-
             <div className="p-6">
               {/* Tabs */}
               <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
@@ -332,7 +193,11 @@ const CourseView = () => {
                         </div>
                         <div className="flex-shrink-0">
                           {isEnrolled ? (
-                            course.progress === 100 ? (
+                            quizScore ? (
+                              <Link to={`/courses/${id}/quiz`}>
+                                <Button variant="outline">View Quiz</Button>
+                              </Link>
+                            ) : progress === 100 ? (
                               <Link to={`/courses/${id}/quiz`}>
                                 <Button variant="primary">Start Quiz</Button>
                               </Link>
@@ -348,9 +213,9 @@ const CourseView = () => {
                           )}
                         </div>
                       </div>
-                      {isEnrolled && course.progress !== 100 && (
+                      {isEnrolled && progress !== 100 && !quizScore && (
                         <p className="text-sm text-slate-500 mt-3">
-                          Your current progress is {course.progress}%. Complete all lessons to take the quiz.
+                          Your current progress is {progress}%. Complete all lessons to take the quiz.
                         </p>
                       )}
                     </div>
@@ -364,7 +229,7 @@ const CourseView = () => {
 
                   <div className="mb-4 flex justify-between items-center">
                     <div className="text-sm text-slate-600 dark:text-slate-400">
-                      <span className="font-medium">{course.lessons.length} lessons</span>
+                      <span className="font-medium">{userLessons.length} lessons</span>
                       <span className="mx-2">•</span>
                       <span>{course.duration} total</span>
                     </div>
@@ -375,7 +240,7 @@ const CourseView = () => {
                   </div>
 
                   <div className="border border-slate-200 rounded-lg divide-y divide-slate-200 dark:border-slate-700 dark:divide-slate-700">
-                    {course.lessons.map((lesson: UserLesson, index: number) => (
+                    {userLessons.map((lesson: any, index: number) => (
                       <Link
                         key={lesson.id}
                         to={`/courses/${course.id}/lessons/${lesson.id}`}
@@ -406,7 +271,7 @@ const CourseView = () => {
                             {lesson.completed ? 'Review' : 'Start'}
                           </Button>
                         </div>
-                        {!lesson.completed && index > 0 && !course.lessons[index - 1].completed && (
+                        {!lesson.completed && index > 0 && !userLessons[index - 1].completed && (
                           <Lock size={14} className="ml-auto text-slate-400 flex-shrink-0" />
                         )}
                       </Link>
@@ -427,13 +292,25 @@ const CourseView = () => {
                             </div>
                           </div>
                         </div>
-                        <Link to={`/courses/${id}/quiz`}>
-                          <Button
-                            variant="primary"
-                          >
+                        {isEnrolled ? (
+                          quizScore ? (
+                            <Link to={`/courses/${id}/quiz`}>
+                              <Button variant="outline">View Quiz</Button>
+                            </Link>
+                          ) : progress === 100 ? (
+                            <Link to={`/courses/${id}/quiz`}>
+                              <Button variant="primary">Start Quiz</Button>
+                            </Link>
+                          ) : (
+                            <Button variant="primary" disabled title="Complete all lessons to unlock the quiz">
+                              Start Quiz
+                            </Button>
+                          )
+                        ) : (
+                          <Button variant="primary" disabled title="Enroll in the course to take the quiz">
                             Start Quiz
                           </Button>
-                        </Link>
+                        )}
                       </div>
                     )}
                   </div>
@@ -488,11 +365,11 @@ const CourseView = () => {
           <Card className="sticky top-6">
             <CardContent className="p-6">
               <Button
-                onClick={() => isEnrolled ? navigate(`/courses/${course.id}/lessons/${course.lessons?.[0]?.id || ''}`) : handleEnroll(course.id)}
+                onClick={() => isEnrolled ? navigate(`/courses/${course.id}/lessons/${userLessons?.[0]?.id || ''}`) : handleEnroll(course.id)}
                 leftIcon={isEnrolled ? <Play size={18} /> : <BookOpen size={18} />}
                 fullWidth
               >
-                {isEnrolled ? (course.progress > 0 ? 'Continue Course' : 'Start Course') : 'Enroll Now'}
+                {isEnrolled ? (progress > 0 ? 'Continue Course' : 'Start Course') : 'Enroll Now'}
               </Button>
 
               <div className="space-y-4 mt-6">
@@ -532,7 +409,7 @@ const CourseView = () => {
                   <BookOpen size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
                   <div>
                     <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Lessons</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">{course.lessons.length} lessons</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{userLessons.length} lessons</p>
                   </div>
                 </div>
               </div>
@@ -542,42 +419,66 @@ const CourseView = () => {
                   <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-3">Course Progress</h3>
                   <div className="mb-2 flex justify-between items-center">
                     <span className="text-sm text-slate-600 dark:text-slate-400">
-                      {Math.round(course.progress)}% complete
+                      {Math.round(progress)}% complete
                     </span>
                     <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                      {course.lessons.filter((l: UserLesson) => l.completed).length} of {course.lessons.length} lessons
+                      {userLessons.filter((l: any) => l.completed).length} of {userLessons.length} lessons
                     </span>
                   </div>
                   <div className="w-full bg-slate-200 rounded-full h-2 mb-4 dark:bg-slate-700">
                     <div
                       className="bg-blue-600 h-2 rounded-full dark:bg-blue-500"
-                      style={{ width: `${course.progress}%` }}
+                      style={{ width: `${progress}%` }}
                     ></div>
                   </div>
 
-                  <div className="space-y-2">
-                    {course.lessons.map((lesson: UserLesson, index: number) => (
-                      <Link
-                        key={lesson.id}
-                        to={`/courses/${course.id}/lessons/${lesson.id}`}
-                        className="flex items-center px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700"
-                      >
-                        {lesson.completed ? (
-                          <CheckCircle size={16} className="text-green-500 dark:text-green-400 mr-2 flex-shrink-0" />
-                        ) : (
-                          <div className="w-4 h-4 flex items-center justify-center rounded-full border border-slate-300 dark:border-slate-600 mr-2 flex-shrink-0">
-                            <span className="text-xs text-slate-600 dark:text-slate-400">{index + 1}</span>
+                  {quizScore && (
+                    <div className="mt-4 p-4 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-300 rounded-xl shadow flex flex-col items-center">
+                      <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                        <Award size={20} className="text-amber-500" /> Quiz Score
+                      </h4>
+                      <div className="flex flex-col items-center w-full">
+                        {/* Progress Circle for Percentage */}
+                        <div className="relative flex items-center justify-center mb-3">
+                          <svg width="64" height="64" viewBox="0 0 64 64">
+                            <circle cx="32" cy="32" r="28" fill="none" stroke="#dbeafe" strokeWidth="8" />
+                            <circle
+                              cx="32"
+                              cy="32"
+                              r="28"
+                              fill="none"
+                              stroke="#2563eb"
+                              strokeWidth="8"
+                              strokeDasharray={2 * Math.PI * 28}
+                              strokeDashoffset={2 * Math.PI * 28 * (1 - quizScore.percentage / 100)}
+                              strokeLinecap="round"
+                              style={{ transition: 'stroke-dashoffset 0.6s' }}
+                            />
+                            <text x="32" y="38" textAnchor="middle" fontSize="1.3em" fill="#2563eb" fontWeight="bold">
+                              {quizScore.percentage}%
+                            </text>
+                          </svg>
+                        </div>
+                        <div className="flex flex-col gap-2 w-full mt-2">
+                          <div className="flex items-center gap-2 text-blue-800 text-base">
+                            <CheckCircle size={18} className="text-green-500" />
+                            <span>Correct Questions:</span>
+                            <span className="font-bold text-green-700">{quizScore.correctQuestions}</span>
                           </div>
-                        )}
-                        <span className="text-sm truncate text-slate-700 dark:text-slate-300">
-                          {lesson.title}
-                        </span>
-                        {!lesson.completed && index > 0 && !course.lessons[index - 1].completed && (
-                          <Lock size={14} className="ml-auto text-slate-400 flex-shrink-0" />
-                        )}
-                      </Link>
-                    ))}
-                  </div>
+                          <div className="flex items-center gap-2 text-blue-800 text-base">
+                            <BarChart size={18} className="text-blue-500" />
+                            <span>Percentage:</span>
+                            <span className="font-bold text-blue-700">{quizScore.percentage}%</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-blue-800 text-base">
+                            <Award size={18} className="text-amber-500" />
+                            <span>Points:</span>
+                            <span className="font-bold text-amber-600">{quizScore.points}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

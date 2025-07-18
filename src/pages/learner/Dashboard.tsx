@@ -1,17 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { BookOpen, Award, Clock, CheckCircle2, BarChart3 } from 'lucide-react';
-import { useUser } from '../../contexts/UserContext';
+import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchCurrentUser } from '../../store/userSlice';
+import { fetchEnrollments } from '../../store/enrollmentsSlice';
+import { RootState } from '../../store';
 import Button from '../../components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toaster';
-import { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase';
 
 interface Lesson {
   id: string;
   title: string;
   duration: string;
-  type: 'video' | 'text' | 'quiz';
+    type: 'video' | 'text' | 'quiz';
   videoUrl?: string;
 }
 
@@ -43,9 +45,10 @@ interface CourseEnrollment {
 }
 
 const LearnerDashboard = () => {
-  const [fetchedCourses, setFetchedCourses] = useState<Course[]>([]);
-  const [myCourses, setMyCourses] = useState<Course[]>([]);
-  const { user } = useUser();
+  const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.user.data);
+  const enrollments = useSelector((state: RootState) => state.enrollments.data);
+  const loading = useSelector((state: RootState) => state.enrollments.loading);
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -69,99 +72,25 @@ const LearnerDashboard = () => {
   ];
 
   useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("courses")
-          .select('*')
-          .eq('is_active', true);
-
-        if (error) {
-          throw error;
-        }
-
-        // Add mock progress data for demonstration
-        const coursesWithProgress = data.map((course: Course) => ({
-          ...course,
-          progress: Math.floor(Math.random() * 100), // Random progress for demo
-          lastAccessed: '2 days ago', // Mock last accessed
-          nextLesson: course.lessons?.[0]?.title || 'Start Course' // Use first lesson or default
-        }));
-
-        setFetchedCourses(coursesWithProgress);
-      } catch (error: any) {
-        addToast({
-          title: "Error retrieving courses",
-          message: error.message,
-          type: "error"
-        });
-      }
-    };
-
-    fetchCourses();
-  }, [user, addToast]);
+    if (!user) {
+      dispatch(fetchCurrentUser());
+    }
+  }, [dispatch, user]);
 
   useEffect(() => {
-    const fetchMyCourses = async () => {
-      if (!user) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('course_enrollments')
-          .select(`
-            courses (*),
-            lessons
-          `)
-          .eq('user_id', user.id);
-
-        if (error) throw error;
-
-        const enrolledCourses = (data as any[]).map(enrollment => {
-          const course = enrollment.courses;
-          const userLessons = enrollment.lessons || [];
-
-          // Calculate progress based on user's completed lessons
-          const completedLessonsCount = userLessons.filter((l: any) => l.completed).length || 0;
-          const totalLessonsCount = userLessons.length || 0;
-          const calculatedProgress = totalLessonsCount > 0
-            ? Math.round((completedLessonsCount / totalLessonsCount) * 100)
-            : 0;
-
-          // Find the next incomplete lesson
-          const nextLesson = userLessons.find((l: any) => !l.completed)?.title || 'Course Completed';
-
-          return {
-            ...course,
-            progress: calculatedProgress,
-            lastAccessed: '2 days ago', // You might want to store and fetch this from the database
-            nextLesson,
-            userLessons // Store user's lesson progress
-          };
-        });
-
-        setMyCourses(enrolledCourses);
-      } catch (error: any) {
-        addToast({
-          title: "Error receiving courses",
-          message: error.message,
-          type: "error",
-        });
-      }
-    };
-
-    if (user) {
-      fetchMyCourses();
+    if (user?.id && (!enrollments || enrollments.length === 0)) {
+      dispatch(fetchEnrollments(user.id));
     }
-  }, [user]);
+  }, [dispatch, user?.id, enrollments]);
 
-
+  if (loading) return <div>Loading enrollments...</div>;
 
   return (
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user?.name}</h1>
         <p className="text-slate-600 mt-1">
-          Your learning journey continues. You have {myCourses.length} courses in progress.
+          Your learning journey continues. You have {enrollments.length} courses in progress.
         </p>
       </div>
 
@@ -171,7 +100,7 @@ const LearnerDashboard = () => {
             <div className="flex justify-between">
               <div className="space-y-1">
                 <p className="text-sm text-slate-500">Courses in Progress</p>
-                <p className="text-2xl font-semibold">{myCourses.length}</p>
+                <p className="text-2xl font-semibold">{enrollments.length}</p>
               </div>
               <div className="p-3 bg-blue-50 rounded-full">
                 <BookOpen size={20} className="text-blue-600" />
@@ -214,39 +143,39 @@ const LearnerDashboard = () => {
           <h2 className="text-xl font-semibold text-slate-900 mb-4">Continue Learning</h2>
 
           <div className="space-y-6">
-            {myCourses.map(course => (
-              <Card key={course.id} className="overflow-hidden hover:shadow-md transition-shadow">
+            {enrollments.map(enrollment => (
+              <Card key={enrollment.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <div className="sm:flex">
                   <div className="sm:w-1/3 h-48 sm:h-auto">
                     <img
-                      src={course.thumbnail}
-                      alt={course.title}
+                      src={enrollment.course.thumbnail}
+                      alt={enrollment.course.title}
                       className="w-full h-full object-cover"
                     />
                   </div>
                   <div className="p-6 sm:w-2/3">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-2">{course.title}</h3>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">{enrollment.course.title}</h3>
 
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm text-slate-600">Progress</span>
-                        <span className="text-sm font-medium">{course.progress}%</span>
+                        <span className="text-sm font-medium">{enrollment.progress}%</span>
                       </div>
                       <div className="w-full bg-slate-200 rounded-full h-2">
                         <div
                           className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${course.progress}%` }}
+                          style={{ width: `${enrollment.progress}%` }}
                         ></div>
                       </div>
                     </div>
 
                     <div className="text-sm text-slate-600 mb-4">
-                      <p>Last accessed: {course.lastAccessed}</p>
-                      <p>Next: {course.nextLesson}</p>
+                      <p>Last accessed: {enrollment.lastAccessed}</p>
+                      <p>Next: {enrollment.nextLesson}</p>
                     </div>
 
                     <div className="flex space-x-3">
-                      <Link to={`/courses/${course.id}`} className="inline-block">
+                      <Link to={`/courses/${enrollment.course.id}`} className="inline-block">
                         <Button size="sm" variant="primary">
                           Continue
                         </Button>
@@ -257,7 +186,7 @@ const LearnerDashboard = () => {
                 </div>
               </Card>
             ))}
-            {fetchedCourses.length === 0 && (
+            {enrollments.length === 0 && (
               <div className="text-center py-4 text-slate-500">No courses in progress.</div>
             )}
           </div>
@@ -271,34 +200,51 @@ const LearnerDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {fetchedCourses.map(course => (
-                <Card key={course.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="h-40">
-                    <img
-                      src={course.thumbnail}
-                      alt={course.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold text-slate-900 mb-2">{course.title}</h3>
-                    <div className="flex items-center text-sm text-slate-600 mb-3">
-                      <Clock size={16} className="mr-1" />
-                      <span>{course.duration}</span>
-                      <span className="mx-2">•</span>
-                      <span>{course.level}</span>
-                    </div>
-                    <Button size="sm" variant="outline" fullWidth onClick={() => handleEnroll(course.id)}>
-                      Enroll Now
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-              {fetchedCourses.length === 0 && (
-                <div className="text-center py-4 text-slate-500 col-span-2">
-                  No recommended courses found. Please add some courses in the admin panel.
+              {/* This section needs to be updated to fetch and display all courses */}
+              {/* For now, it's a placeholder */}
+              <Card className="overflow-hidden hover:shadow-md transition-shadow">
+                <div className="h-40">
+                  <img
+                    src="https://via.placeholder.com/150"
+                    alt="Placeholder"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-              )}
+                <CardContent className="p-4">
+                  <h3 className="font-semibold text-slate-900 mb-2">Placeholder Course</h3>
+                  <div className="flex items-center text-sm text-slate-600 mb-3">
+                    <Clock size={16} className="mr-1" />
+                    <span>1 hour</span>
+                    <span className="mx-2">•</span>
+                    <span>Beginner</span>
+                  </div>
+                  <Button size="sm" variant="outline" fullWidth onClick={() => handleEnroll('placeholder-id')}>
+                    Enroll Now
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card className="overflow-hidden hover:shadow-md transition-shadow">
+                <div className="h-40">
+                  <img
+                    src="https://via.placeholder.com/150"
+                    alt="Placeholder"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <CardContent className="p-4">
+                  <h3 className="font-semibold text-slate-900 mb-2">Placeholder Course</h3>
+                  <div className="flex items-center text-sm text-slate-600 mb-3">
+                    <Clock size={16} className="mr-1" />
+                    <span>1 hour</span>
+                    <span className="mx-2">•</span>
+                    <span>Beginner</span>
+                  </div>
+                  <Button size="sm" variant="outline" fullWidth onClick={() => handleEnroll('placeholder-id')}>
+                    Enroll Now
+                  </Button>
+                </CardContent>
+              </Card>
+              {/* End of placeholder */}
             </div>
           </div>
         </div>

@@ -12,6 +12,9 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { Save, ArrowLeft, Trash2, Plus, Image, Edit, FileText, Video, Award, Upload, Loader2, X, Info } from 'lucide-react';
 import { useToast } from '../../../components/ui/Toaster';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState, AppDispatch } from '../../../store';
+import { fetchCourseById, createCourse, updateCourse, clearCurrentCourse } from '../../../store/coursesSlice';
 import { supabase } from '../../../lib/supabase';
 
 interface CourseFormData {
@@ -43,6 +46,8 @@ const CourseEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const dispatch = useDispatch<AppDispatch>();
+  const { currentCourse, loading, error } = useSelector((state: RootState) => state.courses);
   const isEditing = !!id;
 
   const [formData, setFormData] = useState<CourseFormData>({
@@ -63,7 +68,6 @@ const CourseEditor = () => {
   });
 
   const [errors, setErrors] = useState<Partial<CourseFormData>>({});
-  const [isLoading, setIsLoading] = useState(false);
   const [lessons, setLessons] = useState<{ id: string; title: string; order: number; type: 'text' | 'video' | 'quiz' }[]>([]);
   const [expandedLesson, setExpandedLesson] = useState<string | null>(null);
   const [uploadingLessonId, setUploadingLessonId] = useState<string | null>(null);
@@ -71,53 +75,31 @@ const CourseEditor = () => {
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   useEffect(() => {
-    const fetchCourse = async () => {
-      if (!isEditing) return;
+    if (isEditing && id) {
+      dispatch(fetchCourseById(id));
+    }
+  }, [dispatch, id, isEditing]);
 
-      setIsLoading(true);
-      try {
-        const { data: course, error } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('id', id)
-          .single();
-
-        if (error) throw error;
-
-        if (course) {
-          setFormData({
-            title: course.title,
-            description: course.description,
-            thumbnail: null,
-            thumbnailUrl: course.thumbnail || '',
-            duration: course.duration,
-            level: course.level as 'beginner' | 'intermediate' | 'advanced',
-            isActive: course.is_active,
-            instructor: course.instructor,
-            instructorTitle: course.instructor_title,
-            instructor_avatar: null,
-            instructor_avatarUrl: course.instructor_avatar || '',
-            objectives: course.objectives || [],
-            category: course.category as 'Technology' | 'Food' | 'Education' | 'Travel' | 'Life Lessons' | 'Others',
-            lessons: course.lessons || []
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching course:', error);
-        addToast({
-          type: 'error',
-          title: 'Error loading course',
-          message: 'Please try again later.',
-          duration: 5000,
-        });
-        navigate('/admin/courses');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCourse();
-  }, [id, isEditing, navigate, addToast]);
+  useEffect(() => {
+    if (currentCourse && isEditing) {
+      setFormData({
+        title: currentCourse.title,
+        description: currentCourse.description,
+        thumbnail: null,
+        thumbnailUrl: currentCourse.thumbnail || '',
+        duration: currentCourse.duration,
+        level: currentCourse.level as 'beginner' | 'intermediate' | 'advanced',
+        isActive: currentCourse.is_active,
+        instructor: currentCourse.instructor,
+        instructorTitle: currentCourse.instructor_title || '',
+        instructor_avatar: null,
+        instructor_avatarUrl: currentCourse.instructor_avatar || '',
+        objectives: currentCourse.objectives || [],
+        category: currentCourse.category as 'Technology' | 'Food' | 'Education' | 'Travel' | 'Life Lessons' | 'Others',
+        lessons: currentCourse.lessons || []
+      });
+    }
+  }, [currentCourse, isEditing]);
 
   const validateForm = () => {
     const newErrors: Partial<CourseFormData> = {};
@@ -183,8 +165,6 @@ const CourseEditor = () => {
     e.preventDefault();
 
     if (!validateForm()) return;
-
-    setIsLoading(true);
 
     try {
       let thumbUrl = formData.thumbnailUrl;
@@ -257,17 +237,15 @@ const CourseEditor = () => {
         duration: 5000,
       });
       navigate('/admin/courses');
-    } catch (error) {
-      console.error('Error saving course:', error);
-      addToast({
-        type: 'error',
-        title: 'Error saving course',
-        message: 'Please try again later.',
-        duration: 5000,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+          } catch (error) {
+        console.error('Error saving course:', error);
+        addToast({
+          type: 'error',
+          title: 'Error saving course',
+          message: 'Please try again later.',
+          duration: 5000,
+        });
+      }
   };
 
   const handleAddLesson = () => {
@@ -355,7 +333,7 @@ const CourseEditor = () => {
       return;
     }
 
-    setIsLoading(true);
+    
 
     try {
       // Delete the course from Supabase
@@ -414,7 +392,7 @@ const CourseEditor = () => {
         duration: 5000,
       });
     } finally {
-      setIsLoading(false);
+      
     }
   };
 
@@ -473,7 +451,7 @@ const CourseEditor = () => {
             variant="danger"
             onClick={handleDeleteCourse}
             leftIcon={<Trash2 size={18} />}
-            isLoading={isLoading}
+            isLoading={loading}
           >
             Delete Course
           </Button>
@@ -498,7 +476,7 @@ const CourseEditor = () => {
                   onChange={handleChange}
                   error={errors.title}
                   fullWidth
-                  disabled={isLoading}
+                  disabled={loading}
                   className='p-2'
                 />
 
@@ -514,7 +492,7 @@ const CourseEditor = () => {
                     placeholder="Describe the course content and learning objectives"
                     value={formData.description}
                     onChange={handleChange}
-                    disabled={isLoading}
+                    disabled={loading}
                   ></textarea>
                   {errors.description && (
                     <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.description}</p>
@@ -573,7 +551,7 @@ const CourseEditor = () => {
                     onChange={handleChange}
                     fullWidth
                     className='p-2'
-                    disabled={isLoading}
+                    disabled={loading}
                   />
                   <Input
                     id="instructorTitle"
@@ -584,7 +562,7 @@ const CourseEditor = () => {
                     value={formData.instructorTitle}
                     onChange={handleChange}
                     fullWidth
-                    disabled={isLoading}
+                    disabled={loading}
                   />
                 </div>
 
@@ -641,7 +619,7 @@ const CourseEditor = () => {
                     onChange={handleChange}
                     error={errors.duration}
                     fullWidth
-                    disabled={isLoading}
+                    disabled={loading}
                   />
 
                   <div>
@@ -654,7 +632,7 @@ const CourseEditor = () => {
                       className="w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100 p-2"
                       value={formData.level}
                       onChange={handleChange}
-                      disabled={isLoading}
+                      disabled={loading}
                     >
                       <option value="beginner">Beginner</option>
                       <option value="intermediate">Intermediate</option>
@@ -673,7 +651,7 @@ const CourseEditor = () => {
                     className="p-2 w-full rounded-md shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
                     value={formData.category}
                     onChange={handleChange}
-                    disabled={isLoading}
+                    disabled={loading}
                   >
                     <option value="Technology">Technology</option>
                     <option value="Food">Food</option>
@@ -693,7 +671,7 @@ const CourseEditor = () => {
                     className="p-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600 rounded"
                     checked={formData.isActive}
                     onChange={handleChange}
-                    disabled={isLoading}
+                    disabled={loading}
                   />
                   <label htmlFor="isActive" className="ml-2 block text-sm text-slate-700 dark:text-slate-300">
                     Course is active and visible to learners
@@ -883,14 +861,14 @@ const CourseEditor = () => {
                 <Button
                   variant="outline"
                   onClick={() => navigate('/admin/courses')}
-                  disabled={isLoading}
+                  disabled={loading}
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   leftIcon={<Save size={18} />}
-                  isLoading={isLoading}
+                  isLoading={loading}
                 >
                   {isEditing ? 'Update Course' : 'Create Course'}
                 </Button>

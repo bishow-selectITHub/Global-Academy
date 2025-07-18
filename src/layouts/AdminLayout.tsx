@@ -91,7 +91,7 @@ const AdminLayout = () => {
               <div className="px-4 mb-6">
                 <div className="flex items-center">
                   <img
-                    src={user?.profilePicture || "https://via.placeholder.com/40x40.png?text=U"}
+                    src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
                     alt={user?.name}
                     className="h-12 w-12 rounded-full mr-3"
                   />
@@ -202,12 +202,12 @@ const AdminLayout = () => {
             {collapsed ? (
               <div className="flex flex-col items-center">
                 <img
-                  src={user?.profilePicture || "https://via.placeholder.com/40x40.png?text=U"}
+                  src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
                   alt={user?.name}
                   className="h-10 w-10 rounded-full mb-2"
                 />
                 <button
-                  onClick={logout}
+                  onClick={() => logout()}
                   className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
                   title="Logout"
                 >
@@ -218,7 +218,7 @@ const AdminLayout = () => {
               <div>
                 <div className="flex items-center mb-4">
                   <img
-                    src={user?.profilePicture || "https://via.placeholder.com/40x40.png?text=U"}
+                    src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
                     alt={user?.name}
                     className="h-10 w-10 rounded-full mr-3"
                   />
@@ -228,7 +228,7 @@ const AdminLayout = () => {
                   </div>
                 </div>
                 <button
-                  onClick={logout}
+                  onClick={() => logout()}
                   className="w-full flex items-center px-3 py-2 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                 >
                   <LogOut size={18} className="mr-2" />
