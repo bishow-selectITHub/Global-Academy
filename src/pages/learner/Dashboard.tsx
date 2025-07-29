@@ -8,6 +8,7 @@ import { RootState } from '../../store';
 import Button from '../../components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toaster';
+import { useUser } from '../../contexts/UserContext';
 
 interface Lesson {
   id: string;
@@ -46,7 +47,8 @@ interface CourseEnrollment {
 
 const LearnerDashboard = () => {
   const dispatch = useDispatch();
-  const user = useSelector((state: RootState) => state.user.data);
+  const { user } = useUser();
+  const courses = useSelector((state: RootState) => state.courses.data);
   const enrollments = useSelector((state: RootState) => state.enrollments.data);
   const loading = useSelector((state: RootState) => state.enrollments.loading);
   const { addToast } = useToast();
@@ -84,6 +86,13 @@ const LearnerDashboard = () => {
   }, [dispatch, user?.id, enrollments]);
 
   if (loading) return <div>Loading enrollments...</div>;
+
+  // Map courseId to enrollment for quick lookup
+  const enrollmentMap = Object.fromEntries(
+    enrollments
+      .filter((e: any) => e.user_id === user.id)
+      .map((e: any) => [e.course_id, e])
+  );
 
   return (
     <div>
@@ -200,51 +209,41 @@ const LearnerDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* This section needs to be updated to fetch and display all courses */}
-              {/* For now, it's a placeholder */}
-              <Card className="overflow-hidden hover:shadow-md transition-shadow">
-                <div className="h-40">
-                  <img
-                    src="https://via.placeholder.com/150"
-                    alt="Placeholder"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-slate-900 mb-2">Placeholder Course</h3>
-                  <div className="flex items-center text-sm text-slate-600 mb-3">
-                    <Clock size={16} className="mr-1" />
-                    <span>1 hour</span>
-                    <span className="mx-2">•</span>
-                    <span>Beginner</span>
-                  </div>
-                  <Button size="sm" variant="outline" fullWidth onClick={() => handleEnroll('placeholder-id')}>
-                    Enroll Now
-                  </Button>
-                </CardContent>
-              </Card>
-              <Card className="overflow-hidden hover:shadow-md transition-shadow">
-                <div className="h-40">
-                  <img
-                    src="https://via.placeholder.com/150"
-                    alt="Placeholder"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-slate-900 mb-2">Placeholder Course</h3>
-                  <div className="flex items-center text-sm text-slate-600 mb-3">
-                    <Clock size={16} className="mr-1" />
-                    <span>1 hour</span>
-                    <span className="mx-2">•</span>
-                    <span>Beginner</span>
-                  </div>
-                  <Button size="sm" variant="outline" fullWidth onClick={() => handleEnroll('placeholder-id')}>
-                    Enroll Now
-                  </Button>
-                </CardContent>
-              </Card>
-              {/* End of placeholder */}
+              {courses.map((course: any) => {
+                const enrollment = enrollmentMap[course.id];
+                return (
+                  <Card key={course.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                    <div className="h-40">
+                      <img
+                        src={course.thumbnail}
+                        alt={course.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold text-slate-900 mb-2">{course.title}</h3>
+                      <div className="flex items-center text-sm text-slate-600 mb-3">
+                        <Clock size={16} className="mr-1" />
+                        <span>{course.duration}</span>
+                        <span className="mx-2">•</span>
+                        <span>{course.level}</span>
+                      </div>
+                      {enrollment ? (
+                        <div>
+                          <p>Progress: {enrollment.progress || 0}%</p>
+                          <Button size="sm" variant="primary" fullWidth onClick={() => handleEnroll(course.id)}>
+                            Continue
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button size="sm" variant="outline" fullWidth onClick={() => handleEnroll(course.id)}>
+                          Enroll Now
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         </div>

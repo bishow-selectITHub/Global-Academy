@@ -5,8 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { useToast } from '../../../components/ui/Toaster';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../../store';
+import { useUser } from '../../../contexts/UserContext';
+import { supabase } from '../../../lib/supabase';
+import { fetchEnrollments } from '../../../store/enrollmentsSlice';
 
 interface Lesson {
   id: string;
@@ -31,9 +34,12 @@ interface Course {
 }
 
 const EnrollPage = () => {
+  const { user } = useUser();
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const [isLoading, setIsLoading] = React.useState(false);
+  const dispatch = useDispatch();
 
   // Defensive check for courses slice
   const courseSlice = useSelector((state: RootState) => state.courses || { data: [] });
@@ -101,6 +107,8 @@ const EnrollPage = () => {
           message: 'You are already enrolled in this course.',
           duration: 3000,
         });
+        // Refetch enrollments and redirect
+        dispatch(fetchEnrollments(user.id));
         navigate(`/courses/${course.id}`);
         return;
       }
@@ -121,6 +129,19 @@ const EnrollPage = () => {
       console.log('Enrollment result:', { data, error });
 
       if (error) throw error;
+
+      if (data) {
+        addToast({
+          type: 'success',
+          title: 'Enrollment successful!',
+          message: 'You have been enrolled in the course.',
+          duration: 3000,
+        });
+        // Refetch enrollments and redirect
+        dispatch(fetchEnrollments(user.id));
+        navigate(`/courses/${course.id}`);
+        return;
+      }
 
       addToast({
         type: 'success',

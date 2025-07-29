@@ -19,12 +19,45 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 
 import { supabase } from '../../../lib/supabase';
+import { HMSRoomProvider } from "@100mslive/react-sdk";
+import { HMSPrebuilt } from "@100mslive/roomkit-react";
 
 const GENERATE_TOKEN_ENDPOINT = "https://smqnaddacvwwuehxymbr.supabase.co/functions/v1/generate-hms-token";
+
+// Add type for LiveSessionModal props
+interface LiveSessionModalProps {
+  open: boolean;
+  onClose: () => void;
+  token: string | null;
+  userId: string;
+  roomId: string;
+}
+
+const LiveSessionModal = ({ open, onClose, token, userId, roomId }: LiveSessionModalProps) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center">
+      <div className="w-full h-full relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 bg-white text-black rounded px-4 py-2 shadow-lg z-50"
+        >
+          ×
+        </button>
+        {token ? (
+          <HMSPrebuilt authToken={token} userName={userId} />
+        ) : (
+          <div className="flex items-center justify-center h-full text-white text-lg">Joining live session...</div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [joinModal, setJoinModal] = useState<{ open: boolean, token: string | null, userId: string, roomId: string } | null>(null);
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -60,14 +93,12 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
         body: JSON.stringify({
           user_id: user.id,
           room_id: session.room_id,
-          role: 'guest', // or whatever your learner role is in 100ms
+          role: 'guest',
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to generate 100ms token');
-      // Use data.token with 100ms SDK to join the room
-      console.log('100ms token:', data.token);
-      alert('Token generated! Ready to join.');
+      setJoinModal({ open: true, token: data.token, userId: user.id, roomId: session.room_id });
     } catch (err: any) {
       alert(err.message);
     }
@@ -76,21 +107,43 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
   if (loading) return <div>Loading live sessions...</div>;
 
   return (
-    <div>
-      <h3>Live Sessions</h3>
-      {sessions.length === 0 ? (
-        <div>No live sessions scheduled for this course.</div>
-      ) : (
-        sessions.map(session => (
-          <div key={session.id}>
-            <div>{session.room_name} - {new Date(session.start_time).toLocaleString()}</div>
-            <button onClick={() => handleJoinSession(session)}>
-              Join Live Session
-            </button>
+    <HMSRoomProvider>
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Live Sessions</h3>
+        {sessions.length === 0 ? (
+          <div className="text-slate-500">No live sessions scheduled for this course.</div>
+        ) : (
+          <div className="space-y-4">
+            {sessions.map(session => (
+              <div
+                key={session.id}
+                className="flex items-center justify-between bg-white rounded-lg shadow p-4 border border-slate-200"
+              >
+                <div>
+                  <div className="font-semibold text-slate-800">{session.room_name}</div>
+                  <div className="text-sm text-slate-500">{new Date(session.start_time).toLocaleString()}</div>
+                </div>
+                <button
+                  onClick={() => handleJoinSession(session)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                >
+                  Join Live Session
+                </button>
+              </div>
+            ))}
           </div>
-        ))
-      )}
-    </div>
+        )}
+        {joinModal && joinModal.open && (
+          <LiveSessionModal
+            open={joinModal.open}
+            onClose={() => setJoinModal(null)}
+            token={joinModal.token}
+            userId={joinModal.userId}
+            roomId={joinModal.roomId}
+          />
+        )}
+      </div>
+    </HMSRoomProvider>
   );
 };
 
@@ -115,6 +168,16 @@ const CourseView = () => {
   const userLessons = enrollment?.lessons || course?.lessons || [];
 
   const handleEnroll = (courseId: string) => {
+    console.log('[Enroll Debug] handleEnroll called with courseId:', courseId);
+    if (!courseId) {
+      addToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Invalid course ID. Cannot enroll.',
+        duration: 3000,
+      });
+      return;
+    }
     addToast({
       type: 'info',
       title: 'Redirecting',
@@ -435,6 +498,9 @@ const CourseView = () => {
               )}
             </div>
           </div>
+          {isEnrolled && (
+            <LearnerLiveSessions courseId={course.id} />
+          )}
         </div>
 
         <div className="md:col-span-1">
