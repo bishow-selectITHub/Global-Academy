@@ -1,4 +1,4 @@
-import React, { useEffect,useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Clock,
@@ -38,12 +38,7 @@ const LiveSessionModal = ({ open, onClose, token, userId, roomId }: LiveSessionM
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center">
       <div className="w-full h-full relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 bg-white text-black rounded px-4 py-2 shadow-lg z-50"
-        >
-          ×
-        </button>
+
         {token ? (
           <HMSPrebuilt authToken={token} userName={userId} />
         ) : (
@@ -152,6 +147,7 @@ const CourseView = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
+  const [courseQuiz, setCourseQuiz] = useState<any>(null);
 
   // Defensive checks for slices
   const courseSlice = useSelector((state: RootState) => state.courses || { data: [] });
@@ -159,13 +155,28 @@ const CourseView = () => {
   const quizSlice = useSelector((state: RootState) => state.quizzes || { data: [] });
 
   const course = courseSlice.data.find((c: any) => c.id === id);
+  console.log(course);
   const enrollment = enrollmentSlice.data.find((e: any) => e.course?.id === id);
+  console.log(enrollment)
   const quiz = quizSlice.data.find((q: any) => q.course_id === id);
 
   const quizScore = enrollment?.quizScore;
   const isEnrolled = !!enrollment;
   const progress = enrollment?.progress || 0;
-  const userLessons = enrollment?.lessons || course?.lessons || [];
+  const userLessons = course?.lessons || [];
+
+  useEffect(() => {
+    const fetchQuiz = async () => {
+      if (!course?.id) return;
+      const { data, error } = await supabase
+        .from('quizes')
+        .select('*')
+        .eq('course_id', course.id)
+        .maybeSingle();
+      setCourseQuiz(data && !error ? data : null);
+    };
+    fetchQuiz();
+  }, [course?.id]);
 
   const handleEnroll = (courseId: string) => {
     console.log('[Enroll Debug] handleEnroll called with courseId:', courseId);
@@ -222,15 +233,18 @@ const CourseView = () => {
           </div>
         </div>
         <div className="flex items-center">
-          {isEnrolled ? (
-            <Link to={`/courses/${course.id}/lessons/${userLessons?.[0]?.id || ''}`}>
-              <Button leftIcon={<Play size={20} />}>Continue Learning</Button>
-            </Link>
-          ) : (
-            <Button onClick={() => handleEnroll(course.id)} leftIcon={<BookOpen size={20} />}>
-              Enroll Course
-            </Button>
-          )}
+          {
+            progress !== "100" && <> {isEnrolled ? (
+              <Link to={`/courses/${course.id}/lessons/${userLessons[0]?.id || ''}`}>
+                <Button leftIcon={<Play size={20} />}>Continue Learning</Button>
+              </Link>
+            ) : (
+              <Button onClick={() => handleEnroll(course.id)} leftIcon={<BookOpen size={20} />}>
+                Enroll Course
+              </Button>
+            )}</>
+          }
+
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -336,7 +350,7 @@ const CourseView = () => {
                               <Link to={`/courses/${id}/quiz`}>
                                 <Button variant="outline">View Quiz</Button>
                               </Link>
-                            ) : progress === 100 ? (
+                            ) : progress === "100" ? (
                               <Link to={`/courses/${id}/quiz`}>
                                 <Button variant="primary">Start Quiz</Button>
                               </Link>
@@ -436,7 +450,7 @@ const CourseView = () => {
                             <Link to={`/courses/${id}/quiz`}>
                               <Button variant="outline">View Quiz</Button>
                             </Link>
-                          ) : progress === 100 ? (
+                          ) : progress === "100" ? (
                             <Link to={`/courses/${id}/quiz`}>
                               <Button variant="primary">Start Quiz</Button>
                             </Link>
@@ -510,8 +524,16 @@ const CourseView = () => {
                 onClick={() => isEnrolled ? navigate(`/courses/${course.id}/lessons/${userLessons?.[0]?.id || ''}`) : handleEnroll(course.id)}
                 leftIcon={isEnrolled ? <Play size={18} /> : <BookOpen size={18} />}
                 fullWidth
+                disabled={isEnrolled && progress === "100"}
+                className={isEnrolled && progress === "100" ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500' : ''}
               >
-                {isEnrolled ? (progress > 0 ? 'Continue Course' : 'Start Course') : 'Enroll Now'}
+                {isEnrolled
+                  ? progress === "100"
+                    ? 'Completed'
+                    : progress > 0
+                      ? 'Continue Course'
+                      : 'Start Course'
+                  : 'Enroll Now'}
               </Button>
 
               <div className="space-y-4 mt-6">
@@ -564,7 +586,7 @@ const CourseView = () => {
                       {Math.round(progress)}% complete
                     </span>
                     <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                      {userLessons.filter((l: any) => l.completed).length} of {userLessons.length} lessons
+                      {Math.round(Number(progress) / 100 * userLessons.length)} of {userLessons.length} lessons
                     </span>
                   </div>
                   <div className="w-full bg-slate-200 rounded-full h-2 mb-4 dark:bg-slate-700">
@@ -621,6 +643,15 @@ const CourseView = () => {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+              {courseQuiz && (
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex flex-col items-center">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">Available Quiz</h3>
+                  <p className="mb-3 text-blue-800">{courseQuiz.title || 'Quiz'}</p>
+                  <Link to={''}>
+                    <Button variant="primary">Take Quiz</Button>
+                  </Link>
                 </div>
               )}
             </CardContent>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -18,6 +18,8 @@ import { Card, CardContent } from '../../../components/ui/Card';
 import { useToast } from '../../../components/ui/Toaster';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
+import { supabase } from '../../../lib/supabase';
+import { useUser } from '../../../contexts/UserContext';
 
 interface Lesson {
   id: string;
@@ -31,11 +33,13 @@ interface Lesson {
   resources?: any[];
 }
 
-interface Course {
+interface Enrollment {
   id: string;
-  title: string;
+  user_id: string;
+  course_id: string;
   lessons: Lesson[];
-  progress?: number;
+  progress: number;
+  [key: string]: any; // for any extra fields
 }
 
 const LessonView = () => {
@@ -44,15 +48,41 @@ const LessonView = () => {
   const { addToast } = useToast();
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState('');
+  const { user } = useUser();
+  const [hasQuiz, setHasQuiz] = useState(false);
 
   // Defensive checks for slices
   const courseSlice = useSelector((state: RootState) => state.courses || { data: [] });
   const enrollmentSlice = useSelector((state: RootState) => state.enrollments || { data: [] });
 
   const course = courseSlice.data.find((c: any) => c.id === courseId);
-  const enrollment = enrollmentSlice.data.find((e: any) => e.course?.id === courseId);
-  const userLessons = enrollment?.lessons || course?.lessons || [];
+  const enrollment: Enrollment | undefined = (enrollmentSlice.data as Enrollment[]).find((e) => e.course?.id === courseId);
+  const userLessons = course?.lessons || [];
   const lesson = userLessons.find((l: any) => l.id === lessonId);
+
+  const [localLessons, setLocalLessons] = useState<Lesson[]>(userLessons);
+  const [localProgress, setLocalProgress] = useState<number>(enrollment?.progress || 0);
+
+  useEffect(() => {
+    setLocalLessons(userLessons);
+  }, [userLessons]);
+
+  useEffect(() => {
+    setLocalProgress(enrollment?.progress || 0);
+  }, [enrollment]);
+
+  useEffect(() => {
+    const checkQuiz = async () => {
+      if (!courseId) return;
+      const { data, error } = await supabase
+        .from('quizes')
+        .select('id')
+        .eq('course_id', courseId)
+        .maybeSingle();
+      setHasQuiz(!!data && !error);
+    };
+    checkQuiz();
+  }, [courseId]);
 
   if (!lesson || !course) {
     return (
@@ -69,7 +99,7 @@ const LessonView = () => {
   const markAsComplete = async () => {
     try {
       // Update the lesson's completed status in the user's lessons array
-      const updatedLessons = userLessons.map((l: Lesson) =>
+      const updatedLessons = localLessons.map((l: Lesson) =>
         l.id === lessonId ? { ...l, completed: true } : l
       );
 
@@ -81,9 +111,25 @@ const LessonView = () => {
         : 0;
 
       // Update the user's enrollment in Supabase
-      // This part of the logic needs to be adapted to Redux if the enrollment data is managed by Redux
-      // For now, we'll just update the local state and show a toast.
-      // In a real app, this would involve dispatching an action to update the enrollment.
+      if (user && courseId) {
+        const { error } = await supabase
+          .from('course_enrollments')
+          .update({
+            lessons: updatedLessons,
+            progress: newProgress
+          })
+          .eq('user_id', user.id)
+          .eq('course_id', courseId);
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      // Update local state for instant UI feedback
+      setLocalLessons(updatedLessons);
+      setLocalProgress(newProgress);
+
       addToast({
         type: 'success',
         title: 'Lesson completed',
@@ -91,10 +137,13 @@ const LessonView = () => {
         duration: 3000
       });
 
-      // Update local state
-      // setLesson(prev => prev ? { ...prev, completed: true } : null); // This line is no longer needed
-      // setCourse(prev => prev ? { ...prev, lessons: updatedLessons || [], progress: newProgress } : null); // This line is no longer needed
-      // Do not navigate to the next lesson automatically
+      // Move to next lesson if there is one
+      const currentIndex = localLessons.findIndex((l: Lesson) => l.id === lessonId);
+      if (currentIndex < localLessons.length - 1) {
+        const nextLesson = localLessons[currentIndex + 1];
+        navigate(`/courses/${courseId}/lessons/${nextLesson.id}`);
+      }
+
     } catch (error: any) {
       addToast({
         type: 'error',
@@ -116,18 +165,20 @@ const LessonView = () => {
 
   // Navigate to previous/next lesson
   const navigateLesson = (direction: 'prev' | 'next') => {
-    const currentIndex = userLessons.findIndex((l: Lesson) => l.id === lessonId);
+    const currentIndex = localLessons.findIndex((l: Lesson) => l.id === lessonId);
 
     if (currentIndex !== undefined) {
       if (direction === 'prev' && currentIndex > 0) {
-        const prevLesson = userLessons[currentIndex - 1];
+        const prevLesson = localLessons[currentIndex - 1];
         navigate(`/courses/${courseId}/lessons/${prevLesson?.id}`);
-      } else if (direction === 'next' && currentIndex < (userLessons.length || 0) - 1) {
-        const nextLesson = userLessons[currentIndex + 1];
+      } else if (direction === 'next' && currentIndex < (localLessons.length || 0) - 1) {
+        const nextLesson = localLessons[currentIndex + 1];
         navigate(`/courses/${courseId}/lessons/${nextLesson?.id}`);
       }
     }
   };
+
+  const allLessonsCompleted = localLessons.length > 0 && localLessons.every(l => l.completed);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -142,7 +193,7 @@ const LessonView = () => {
               size="sm"
               variant="outline"
               onClick={() => navigateLesson('prev')}
-              disabled={userLessons.findIndex((l: Lesson) => l.id === lessonId) === 0}
+              disabled={localLessons.findIndex((l: Lesson) => l.id === lessonId) === 0}
               leftIcon={<ArrowLeft size={16} />}
             >
               Previous
@@ -151,7 +202,7 @@ const LessonView = () => {
               size="sm"
               variant="outline"
               onClick={() => navigateLesson('next')}
-              disabled={userLessons.findIndex((l: Lesson) => l.id === lessonId) === userLessons.length - 1}
+              disabled={localLessons.findIndex((l: Lesson) => l.id === lessonId) === localLessons.length - 1}
               rightIcon={<ArrowRight size={16} />}
             >
               Next
@@ -319,22 +370,22 @@ const LessonView = () => {
             <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-3">Course Progress</h3>
             <div className="mb-2 flex justify-between items-center">
               <span className="text-sm text-slate-600 dark:text-slate-400">
-                {enrollment?.progress || 0}% complete
+                {localProgress}% complete
               </span>
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                {userLessons.filter((l: Lesson) => l.completed).length} of {userLessons.length} lessons
+                {localLessons.filter((l: Lesson) => l.completed).length} of {localLessons.length} lessons
               </span>
             </div>
             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mb-6">
               <div
                 className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full"
-                style={{ width: `${enrollment?.progress || 0}%` }}
+                style={{ width: `${localProgress}%` }}
               ></div>
             </div>
 
             <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-3">Lesson Navigator</h3>
             <div className="space-y-1">
-              {userLessons.map((courseLesson: Lesson) => (
+              {localLessons.map((courseLesson: Lesson) => (
                 <Link
                   key={courseLesson.id}
                   to={`/courses/${courseId}/lessons/${courseLesson.id}`}
@@ -350,7 +401,7 @@ const LessonView = () => {
                       ? 'border-2 border-blue-500 dark:border-blue-400 text-blue-700 dark:text-blue-400'
                       : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400'
                       }`}>
-                      <span className="text-xs">{userLessons.indexOf(courseLesson) + 1}</span>
+                      <span className="text-xs">{localLessons.indexOf(courseLesson) + 1}</span>
                     </div>
                   )}
                   <span className={`text-sm truncate ${courseLesson.id === lessonId
@@ -364,7 +415,28 @@ const LessonView = () => {
             </div>
 
             <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
-              {!lesson.completed ? (
+              {allLessonsCompleted ? (
+                <>
+                  <Button
+                    fullWidth
+                    leftIcon={<CheckCircle size={16} />}
+                    disabled
+                    className="bg-green-600 text-white hover:bg-green-700 focus:ring-green-500"
+                  >
+                    Completed
+                  </Button>
+                  {hasQuiz && (
+                    <Button
+                      className="mt-3"
+                      fullWidth
+                      variant="outline"
+                      onClick={() => navigate(`/courses/${courseId}/quizzes/attempt`)}
+                    >
+                      Take the quiz
+                    </Button>
+                  )}
+                </>
+              ) : !lesson.completed ? (
                 <Button
                   onClick={markAsComplete}
                   leftIcon={<CheckCircle size={16} />}
@@ -378,7 +450,7 @@ const LessonView = () => {
                   onClick={() => navigateLesson('next')}
                   rightIcon={<ArrowRight size={16} />}
                   fullWidth
-                  disabled={userLessons.findIndex((l: Lesson) => l.id === lessonId) === userLessons.length - 1}
+                  disabled={localLessons.findIndex((l: Lesson) => l.id === lessonId) === localLessons.length - 1}
                 >
                   Next Lesson
                 </Button>

@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { 
-  BookOpen, 
-  Award, 
-  FileText, 
-  Package, 
-  LayoutDashboard, 
-  LogOut, 
+import {
+  BookOpen,
+  Award,
+  FileText,
+  Package,
+  LayoutDashboard,
+  LogOut,
   User,
   Menu,
   X,
@@ -66,7 +66,7 @@ const LearnerLayout = () => {
                 </h1>
               </Link>
             </div>
-            
+
             {/* Desktop Search and User Section */}
             <div className="hidden md:flex items-center space-x-4">
               <div className="relative">
@@ -80,7 +80,7 @@ const LearnerLayout = () => {
               >
                 {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
               </button>
-              
+
               <div className="relative ml-3">
                 <div className="flex items-center">
                   <button className="flex items-center">
@@ -101,7 +101,7 @@ const LearnerLayout = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Mobile menu button */}
             <div className="flex items-center md:hidden">
               <button
@@ -133,11 +133,10 @@ const LearnerLayout = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
-                  isActive(item.path)
-                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                }`}
+                className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${isActive(item.path)
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  }`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <span className="mr-3">{item.icon}</span>
@@ -157,10 +156,9 @@ const LearnerLayout = () => {
 
       <div className="flex-1 flex">
         {/* Left Sidebar - Desktop Only */}
-        <aside 
-          className={`hidden  h-screen fixed   md:flex md:flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-300  ${
-            sidebarCollapsed ? 'md:w-20' : 'md:w-64'
-          }`}
+        <aside
+          className={`hidden h-screen sticky top-0 left-0 md:flex md:flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-300 ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'
+            }`}
         >
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div className={`flex items-center ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
@@ -182,11 +180,10 @@ const LearnerLayout = () => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center px-3 py-3 rounded-md text-sm font-medium ${
-                    isActive(item.path)
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                  className={`flex items-center px-3 py-3 rounded-md text-sm font-medium ${isActive(item.path)
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    } ${sidebarCollapsed ? 'justify-center' : ''}`}
                   title={sidebarCollapsed ? item.label : ''}
                 >
                   <span className={sidebarCollapsed ? '' : 'mr-3'}>{item.icon}</span>
@@ -238,12 +235,11 @@ const LearnerLayout = () => {
         </aside>
 
         {/* Main Content */}
-        <main className={`flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-slate-900 dark:text-slate-100  ${
-            sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'
-          }`}>
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <Outlet />
-          </div>
+        <main className={`flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-slate-900 dark:text-slate-100  
+          `}>
+
+          <Outlet />
+
         </main>
       </div>
     </div>

@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { 
-  BookOpen, 
-  Users, 
-  Award, 
-  Clipboard, 
-  Package, 
-  LayoutDashboard, 
-  ChevronLeft, 
-  ChevronRight, 
-  LogOut, 
+import {
+  BookOpen,
+  Users,
+  Award,
+  Clipboard,
+  Package,
+  LayoutDashboard,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
   User,
   Menu,
   X,
@@ -65,7 +65,7 @@ const AdminLayout = () => {
           >
             {theme === 'light' ? <Moon size={22} /> : <Sun size={22} />}
           </button>
-          <button 
+          <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
           >
@@ -80,7 +80,7 @@ const AdminLayout = () => {
           <div className="flex flex-col h-full">
             <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Admin Portal</h1>
-              <button 
+              <button
                 onClick={() => setMobileMenuOpen(false)}
                 className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
               >
@@ -109,11 +109,10 @@ const AdminLayout = () => {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center px-4 py-3 rounded-md text-sm font-medium ${
-                      isActive(item.path)
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    }`}
+                    className={`flex items-center px-4 py-3 rounded-md text-sm font-medium ${isActive(item.path)
+                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <span className="mr-3">{item.icon}</span>
@@ -138,10 +137,9 @@ const AdminLayout = () => {
 
       <div className="flex-1 flex">
         {/* Sidebar - Desktop Only */}
-        <aside 
-          className={`hidden md:flex md:flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-300 ${
-            collapsed ? 'md:w-20' : 'md:w-64'
-          }`}
+        <aside
+          className={`hidden h-screen sticky top-0 left-0 md:flex md:flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-300 ${collapsed ? 'md:w-20' : 'md:w-64'
+            }`}
         >
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div className={`flex items-center ${collapsed ? 'justify-center w-full' : ''}`}>
@@ -165,7 +163,7 @@ const AdminLayout = () => {
           <div className={`p-2 ${collapsed ? 'px-2' : 'px-3'} border-b border-slate-200 dark:border-slate-700`}>
             {collapsed ? (
               <div className="flex justify-center py-2">
-                <button 
+                <button
                   className="p-2 rounded-full text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
                   onClick={toggleTheme}
                   title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
@@ -184,11 +182,10 @@ const AdminLayout = () => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center px-3 py-3 rounded-md text-sm font-medium ${
-                    isActive(item.path)
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  } ${collapsed ? 'justify-center' : ''}`}
+                  className={`flex items-center px-3 py-3 rounded-md text-sm font-medium ${isActive(item.path)
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    } ${collapsed ? 'justify-center' : ''}`}
                   title={collapsed ? item.label : ''}
                 >
                   <span className={collapsed ? '' : 'mr-3'}>{item.icon}</span>

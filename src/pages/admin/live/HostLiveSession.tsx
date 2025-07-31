@@ -2,10 +2,33 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { ArrowLeft, Copy, Video, Users, Calendar, Clock, MessageSquare } from "lucide-react"
+import {
+  ArrowLeft,
+  Copy,
+  Video,
+  Users,
+  Calendar,
+  Clock,
+  Plus,
+  Play,
+  UserCheck,
+  RadioIcon,
+  Eye,
+  MoreVertical,
+  Edit,
+  Trash2,
+  TrendingUp,
+  Award,
+  Activity,
+  Mail,
+  Phone,
+  MapPin,
+  GraduationCap,
+  Star,
+} from "lucide-react"
 import { supabase } from "../../../lib/supabase"
 import { useToast } from "../../../components/ui/Toaster"
-import HMSRoomKitHost from "../../../components/live/HMSRoomKitHost";
+import HMSRoomKitHost from "../../../components/live/HMSRoomKitHost"
 
 interface HostLiveSessionProps {
   course: any
@@ -17,6 +40,7 @@ const CREATE_ROOM_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/
 const GENERATE_TOKEN_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-hms-token`
 
 const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => {
+  const [activeTab, setActiveTab] = useState<"enrolled" | "schedule" | "attendance">("enrolled")
   const [form, setForm] = useState({
     roomName: "",
     startDate: "",
@@ -30,9 +54,45 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   const [loadingEnrolled, setLoadingEnrolled] = useState(true)
   const [joiningSession, setJoiningSession] = useState<string | null>(null)
   const { addToast } = useToast()
-  const [videoToken, setVideoToken] = useState<string | null>(null);
-  const [videoUserName, setVideoUserName] = useState<string>("");
+  const [videoToken, setVideoToken] = useState<string | null>(null)
+  const [videoUserName, setVideoUserName] = useState<string>("")
 
+  // Separate live and scheduled sessions
+  const liveSessions = sessions.filter((session) => session.status === "live")
+  const scheduledSessions = sessions.filter((session) => session.status === "scheduled")
+
+  // Mock attendance data (replace with real data later)
+  const attendanceData = [
+    {
+      id: 1,
+      sessionName: "Introduction to React",
+      date: "2024-01-15",
+      attendees: 24,
+      totalEnrolled: 30,
+      duration: "1h 45m",
+      rating: 4.8,
+    },
+    {
+      id: 2,
+      sessionName: "Advanced JavaScript",
+      date: "2024-01-12",
+      attendees: 28,
+      totalEnrolled: 32,
+      duration: "2h 15m",
+      rating: 4.9,
+    },
+    {
+      id: 3,
+      sessionName: "CSS Grid & Flexbox",
+      date: "2024-01-10",
+      attendees: 22,
+      totalEnrolled: 28,
+      duration: "1h 30m",
+      rating: 4.7,
+    },
+  ]
+
+  // Keep existing useEffect hooks...
   useEffect(() => {
     const fetchSessions = async () => {
       setLoadingSessions(true)
@@ -64,7 +124,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     const fetchEnrolled = async () => {
       setLoadingEnrolled(true)
       try {
-        // First get enrollments
         const { data: enrollments, error: enrollmentsError } = await supabase
           .from("course_enrollments")
           .select("user_id")
@@ -79,14 +138,27 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
 
         const userIds = enrollments.map((e) => e.user_id)
 
-        // Then get user details
         const { data: users, error: usersError } = await supabase
           .from("users")
           .select("id, name, email, avatar")
           .in("id", userIds)
 
         if (usersError) throw usersError
-        setEnrolledUsers(users || [])
+
+        // Transform the data to include mock additional data for demo
+        const enrichedUsers = (users || []).map((user) => ({
+          ...user,
+          enrolledAt: new Date().toISOString(), // Mock enrollment date
+          progress: Math.floor(Math.random() * 100), // Mock progress
+          location: "New York, USA",
+          phone: "+1 (555) 123-4567",
+          completedLessons: Math.floor(Math.random() * 10),
+          totalLessons: 10,
+          lastActive: "2 hours ago",
+          rating: 4.5 + Math.random() * 0.5,
+        }))
+
+        setEnrolledUsers(enrichedUsers)
       } catch (error: any) {
         console.error("Error fetching enrolled users:", error)
         addToast?.({
@@ -103,6 +175,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     fetchEnrolled()
   }, [course.id, addToast])
 
+  // Keep existing handlers...
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: value }))
@@ -113,7 +186,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     setSubmitting(true)
 
     try {
-      // 1. Get current user's access token
       const {
         data: { session },
         error: sessionError,
@@ -123,7 +195,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         throw new Error("User not authenticated")
       }
 
-      // 2. Validate form data
       if (!form.roomName.trim()) {
         throw new Error("Room name is required")
       }
@@ -137,9 +208,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       }
 
       const roomNameToSend = form.roomName.trim()
-      console.log("Creating room:", roomNameToSend)
 
-      // 3. Call Supabase Edge Function to create a 100ms room
       const roomResponse = await fetch(CREATE_ROOM_ENDPOINT, {
         method: "POST",
         headers: {
@@ -161,13 +230,11 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       }
 
       const roomData = await roomResponse.json()
-      console.log("Room created:", roomData)
 
       if (!roomData.id) {
         throw new Error("Invalid room data received")
       }
 
-      // 4. Save room info to Supabase DB
       const { error: insertError } = await supabase.from("live_sessions").insert({
         course_id: course.id,
         room_id: roomData.id,
@@ -180,7 +247,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
 
       if (insertError) throw insertError
 
-      // 5. Success - refresh sessions and reset form
       addToast?.({
         type: "success",
         title: "Live session scheduled",
@@ -194,7 +260,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         description: "",
       })
 
-      // Refresh sessions list
       const { data: updatedSessions } = await supabase
         .from("live_sessions")
         .select("*")
@@ -232,7 +297,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     }
   }
 
-  // Handler for joining a live session as host
   const handleJoinSession = async (session: any) => {
     setJoiningSession(session.id)
 
@@ -247,9 +311,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       }
 
       const roomId = session.room_id
-      const role = "host" // Host role for the instructor
-
-      console.log("Generating token for:", { roomId, role, userId: authSession.user.id })
+      const role = "host"
 
       const response = await fetch(GENERATE_TOKEN_ENDPOINT, {
         method: "POST",
@@ -269,9 +331,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       }
 
       const tokenData = await response.json()
-      console.log("Token generated successfully:", tokenData)
 
-      // Open video call interface with the token
       setVideoToken(tokenData.token)
       setVideoUserName(instructor)
     } catch (error: any) {
@@ -291,262 +351,629 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   const instructorAvatar =
     course.instructor_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(instructor)}`
 
+  const TabButton = ({
+    tab,
+    icon,
+    label,
+    count,
+    color,
+  }: { tab: string; icon: React.ReactNode; label: string; count?: number; color: string }) => (
+    <button
+      onClick={() => setActiveTab(tab as any)}
+      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${activeTab === tab
+          ? `${color} text-white shadow-md`
+          : "bg-white text-gray-600 hover:text-gray-800 hover:bg-gray-50 border border-gray-200 hover:border-gray-300"
+        }`}
+    >
+      <div className={`${activeTab === tab ? "" : "opacity-70"}`}>{icon}</div>
+      <span className="text-sm">{label}</span>
+      {count !== undefined && (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${activeTab === tab ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+            }`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  )
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="max-w-7xl mx-auto px-6 py-4">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-4">
           <button
-            className="mb-4 flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+            className="mb-6 flex items-center gap-2 text-gray-600 hover:text-indigo-600 transition-colors font-medium"
             onClick={onBack}
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-5 h-5" />
             Back to Courses
           </button>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          {/* Course Info Header */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">
             <div className="flex items-center gap-4">
-              <img
-                src={instructorAvatar || "/placeholder.svg"}
-                alt="Instructor"
-                className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
-              />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-1">{course.title}</h1>
-                <div className="text-gray-700 font-medium">{instructor}</div>
-                <div className="text-gray-500 text-sm">{instructorTitle}</div>
+              <div className="relative">
+                <img
+                  src={instructorAvatar || "/placeholder.svg"}
+                  alt="Instructor"
+                  className="w-16 h-16 rounded-xl object-cover border-2 border-indigo-100"
+                />
+                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+              </div>
+              <div className="flex-1">
+                <h1 className="text-xl font-bold text-gray-900 mb-1 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                  {course.title}
+                </h1>
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="text-gray-700 font-medium text-sm">{instructor}</div>
+                  <div className="text-indigo-600 text-xs font-medium bg-indigo-50 px-2 py-1 rounded-full">
+                    {instructorTitle}
+                  </div>
+                </div>
+                <div className="flex items-center gap-6 text-xs">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Users className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900">{enrolledUsers.length}</div>
+                      <div className="text-xs">Students</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Video className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900">{sessions.length}</div>
+                      <div className="text-xs">Sessions</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                      <RadioIcon className="w-4 h-4 text-red-600" />
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900">{liveSessions.length}</div>
+                      <div className="text-xs">Live Now</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div className="flex gap-6 mb-8">
+            <TabButton
+              tab="enrolled"
+              icon={<Users className="w-5 h-5" />}
+              label="Enrolled Students"
+              count={enrolledUsers.length}
+              color="bg-gradient-to-r from-blue-500 to-indigo-500"
+            />
+            <TabButton
+              tab="schedule"
+              icon={<Calendar className="w-5 h-5" />}
+              label="Schedule Session"
+              color="bg-gradient-to-r from-emerald-500 to-teal-500"
+            />
+            <TabButton
+              tab="attendance"
+              icon={<UserCheck className="w-5 h-5" />}
+              label="Attendance"
+              count={attendanceData.length}
+              color="bg-gradient-to-r from-purple-500 to-pink-500"
+            />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="xl:col-span-2 space-y-8">
-            {/* Enrolled Users */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Users className="w-5 h-5 text-gray-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Enrolled Students</h2>
-                <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-sm">{enrolledUsers.length}</span>
+        {/* Tab Content */}
+        {activeTab === "enrolled" && (
+          <div className="space-y-6">
+            {/* Enrolled Students Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-sm">
+                    <Users className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Total Enrolled</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">{enrolledUsers.length}</p>
+                <p className="text-xs font-medium text-blue-600">Active students</p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg shadow-sm">
+                    <GraduationCap className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Avg Progress</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">
+                  {Math.round(enrolledUsers.reduce((sum, user) => sum + user.progress, 0) / enrolledUsers.length || 0)}%
+                </p>
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3 text-emerald-500" />
+                  <p className="text-xs font-medium text-emerald-600">+12% this week</p>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
+                    <Award className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Completed</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">
+                  {enrolledUsers.filter((user) => user.progress >= 100).length}
+                </p>
+                <p className="text-xs font-medium text-purple-600">Finished course</p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-sm">
+                    <Star className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Avg Rating</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">
+                  {(enrolledUsers.reduce((sum, user) => sum + user.rating, 0) / enrolledUsers.length || 0).toFixed(1)}
+                </p>
+                <p className="text-xs font-medium text-amber-600">Student feedback</p>
+              </div>
+            </div>
+
+            {/* Students List */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-3 p-6 border-b border-gray-200">
+                <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-sm">
+                  <Users className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Enrolled Students</h2>
+                  <p className="text-gray-600 text-sm">Manage and track student progress</p>
+                </div>
               </div>
 
               {loadingEnrolled ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
                 </div>
               ) : enrolledUsers.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                  <p>No students enrolled yet</p>
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">No Students Enrolled</h3>
+                  <p className="text-gray-600 text-sm mb-6 max-w-md mx-auto">
+                    No students have enrolled in this course yet. Share your course to attract learners.
+                  </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {enrolledUsers.map((user) => (
-                    <div key={user.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      {user.avatar ? (
-                        <img
-                          src={user.avatar || "/placeholder.svg"}
-                          alt={user.name}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium">
-                          {user.name?.charAt(0) || "?"}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 truncate">{user.name || "Unknown"}</div>
-                        <div className="text-sm text-gray-500 truncate">{user.email || "No email"}</div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Student</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Progress</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Lessons</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Enrolled</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Address</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {enrolledUsers.map((student, index) => (
+                        <tr
+                          key={student.id}
+                          className={`hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                            }`}
+                        >
+                          {/* Student Info */}
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={
+                                  student.avatar ||
+                                  `https://ui-avatars.com/api/?name=${encodeURIComponent(student.name || student.email)}`
+                                }
+                                alt={student.name}
+                                className="w-10 h-10 rounded-lg object-cover border-2 border-gray-100"
+                              />
+                              <div>
+                                <h3 className="font-semibold text-gray-900 text-sm">{student.name || "Anonymous"}</h3>
+                                <p className="text-gray-600 text-xs">{student.email}</p>
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Star className="w-3 h-3 text-amber-400 fill-current" />
+                                  <span className="text-xs font-medium text-gray-700">{student.rating.toFixed(1)}</span>
+                                  <span className="text-gray-400 mx-1">•</span>
+                                  <span className="text-xs text-gray-500">{student.lastActive}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Progress */}
+                          <td className="py-4 px-6">
+                            <div className="w-full max-w-[120px]">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-bold text-gray-900">{student.progress}%</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                <div
+                                  className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-500"
+                                  style={{ width: `${student.progress}%` }}
+                                />
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {student.progress >= 100 ? "Completed" : "In Progress"}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Lessons */}
+                          <td className="py-4 px-6">
+                            <div className="text-center">
+                              <div className="text-sm font-bold text-gray-900">
+                                {student.completedLessons}/{student.totalLessons}
+                              </div>
+                              <div className="text-xs text-gray-500">lessons</div>
+                              <div className="w-full bg-gray-200 rounded-full h-1 mt-2 overflow-hidden">
+                                <div
+                                  className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                                  style={{ width: `${(student.completedLessons / student.totalLessons) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Enrolled Date */}
+                          <td className="py-4 px-6">
+                            <div className="text-sm font-medium text-gray-900">
+                              {new Date(student.enrolledAt).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {Math.floor(
+                                (new Date().getTime() - new Date(student.enrolledAt).getTime()) / (1000 * 60 * 60 * 24),
+                              )}{" "}
+                              days ago
+                            </div>
+                          </td>
+
+                          {/* Address */}
+                          <td className="py-4 px-6">
+                            <div className="text-sm text-gray-900 max-w-[150px]">
+                              <div className="flex items-center gap-1 mb-1">
+                                <MapPin className="w-3 h-3 text-gray-500" />
+                                <span className="truncate">{student.location}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Phone className="w-3 h-3 text-gray-500" />
+                                <span className="text-xs text-gray-600">{student.phone}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-2">
+                              <button className="bg-blue-50 hover:bg-blue-100 text-blue-600 p-2 rounded-lg text-xs font-medium transition-colors">
+                                <Mail className="w-4 h-4" />
+                              </button>
+                              <button className="bg-gray-50 hover:bg-gray-100 text-gray-600 p-2 rounded-lg text-xs font-medium transition-colors">
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button className="bg-gray-50 hover:bg-gray-100 text-gray-600 p-2 rounded-lg text-xs font-medium transition-colors">
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
-
-            {/* Feedback Section */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <MessageSquare className="w-5 h-5 text-gray-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Recent Feedback</h2>
-              </div>
-              <div className="text-center py-8 text-gray-500">
-                <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                <p>No feedback available yet</p>
-              </div>
-            </div>
           </div>
+        )}
 
-          {/* Sidebar */}
-          <div className="xl:col-span-1 space-y-6">
-            {/* Schedule Form */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Calendar className="w-5 h-5 text-blue-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Schedule Live Session</h2>
+        {activeTab === "schedule" && (
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg shadow-sm">
+                  <Plus className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Schedule New Session</h2>
+                  <p className="text-gray-600 text-sm">Create a new live video session for your course</p>
+                </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Room Name</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">Session Name</label>
                   <input
                     type="text"
                     name="roomName"
                     value={form.roomName}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter room name"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm transition-all duration-200"
+                    placeholder="e.g., Introduction to React Hooks"
                     required
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Date & Time</label>
-                  <input
-                    type="datetime-local"
-                    name="startDate"
-                    value={form.startDate}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-3">Start Date & Time</label>
+                    <input
+                      type="datetime-local"
+                      name="startDate"
+                      value={form.startDate}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm transition-all duration-200"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-3">Maximum Participants</label>
+                    <input
+                      type="number"
+                      name="maxParticipants"
+                      value={form.maxParticipants}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm transition-all duration-200"
+                      min="1"
+                      max="1000"
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Maximum Participants</label>
-                  <input
-                    type="number"
-                    name="maxParticipants"
-                    value={form.maxParticipants}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    min="1"
-                    max="1000"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Description (optional)</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">Description (Optional)</label>
                   <textarea
                     name="description"
                     value={form.description}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                    rows={3}
-                    placeholder="Brief description of the session"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none text-sm transition-all duration-200"
+                    rows={4}
+                    placeholder="Brief description of what will be covered in this session..."
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={submitting}
-                >
-                  {submitting ? "Scheduling..." : "Schedule Live Session"}
-                </button>
+                <div className="pt-6 border-t border-gray-200">
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white py-3 px-6 rounded-xl font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                        Scheduling...
+                      </>
+                    ) : (
+                      <>
+                        <Calendar className="w-5 h-5" />
+                        Schedule Live Session
+                      </>
+                    )}
+                  </button>
+                </div>
               </form>
-            </div>
 
-            {/* Scheduled Sessions */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Video className="w-5 h-5 text-green-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Scheduled Sessions</h2>
-              </div>
-
-              {loadingSessions ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                </div>
-              ) : sessions.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Clock className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                  <p>No sessions scheduled</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {sessions.map((session) => (
-                    <div key={session.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{session.room_name}</h3>
-                          <div className="text-sm text-gray-600 mt-1">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {new Date(session.start_time).toLocaleString()}
-                            </div>
-                            <div className="flex items-center gap-1 mt-1">
-                              <Users className="w-3 h-3" />
-                              Max: {session.max_participants}
-                            </div>
+              {/* Scheduled Sessions List */}
+              {scheduledSessions.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-gray-200">
+                  <h3 className="text-base font-bold text-gray-900 mb-4">Scheduled Sessions</h3>
+                  <div className="space-y-3">
+                    {scheduledSessions.map((session) => (
+                      <div
+                        key={session.id}
+                        className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-gray-900 text-sm">{session.room_name}</h4>
+                          <div className="flex items-center gap-2">
+                            <button className="p-2 text-gray-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors">
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            session.status === "scheduled"
-                              ? "bg-blue-100 text-blue-700"
-                              : session.status === "live"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {session.status}
-                        </span>
+                        <div className="flex items-center gap-4 text-xs text-gray-600 mb-3">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>{new Date(session.start_time).toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            <span>Max: {session.max_participants}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <code className="bg-gray-100 px-3 py-1 rounded text-xs font-mono flex-1">
+                            {session.room_id}
+                          </code>
+                          <button
+                            className="text-emerald-600 hover:text-emerald-700 p-2 rounded-lg hover:bg-emerald-50 transition-colors"
+                            onClick={() => handleCopy(session.room_id)}
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                          <button
+                            className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-1 shadow-sm hover:shadow-md"
+                            onClick={() => handleJoinSession(session)}
+                            disabled={joiningSession === session.id}
+                          >
+                            <Play className="w-4 h-4" />
+                            Start
+                          </button>
+                        </div>
                       </div>
-
-                      {session.description && <p className="text-sm text-gray-600 mb-3">{session.description}</p>}
-
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xs text-gray-500">Room ID:</span>
-                        <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{session.room_id}</code>
-                        <button
-                          className="text-blue-600 hover:text-blue-700 text-xs"
-                          onClick={() => handleCopy(session.room_id)}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </button>
-                      </div>
-
-                      <button
-                        className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        onClick={() => handleJoinSession(session)}
-                        disabled={joiningSession === session.id}
-                      >
-                        {joiningSession === session.id ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            Joining...
-                          </>
-                        ) : (
-                          <>
-                            <Video className="w-4 h-4" />
-                            Join as Host
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === "attendance" && (
+          <div className="space-y-6">
+            {/* Attendance Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
+                    <UserCheck className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Avg Attendance</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">87%</p>
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3 text-purple-500" />
+                  <p className="text-xs font-medium text-purple-600">+5% from last month</p>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-sm">
+                    <Users className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Total Sessions</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">{attendanceData.length}</p>
+                <p className="text-xs font-medium text-blue-600">This month</p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg shadow-sm">
+                    <Clock className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Total Hours</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">12.5h</p>
+                <p className="text-xs font-medium text-emerald-600">Live session time</p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-sm">
+                    <Award className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Avg Rating</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">4.8</p>
+                <p className="text-xs font-medium text-amber-600">Session feedback</p>
+              </div>
+            </div>
+
+            {/* Attendance Records */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
+                  <Activity className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Session Attendance Records</h2>
+                  <p className="text-gray-600 text-sm">Detailed attendance for each live session</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {attendanceData.map((record) => (
+                  <div
+                    key={record.id}
+                    className="border border-gray-200 rounded-xl p-4 hover:bg-gradient-to-r hover:from-gray-50 hover:to-purple-50 hover:border-purple-200 transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="text-base font-bold text-gray-900">{record.sessionName}</h3>
+                        <p className="text-gray-600 font-medium text-sm">
+                          {new Date(record.date).toLocaleDateString("en-US", {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xl font-bold text-gray-900">
+                          {record.attendees}/{record.totalEnrolled}
+                        </div>
+                        <div className="text-sm font-semibold text-purple-600">
+                          {Math.round((record.attendees / record.totalEnrolled) * 100)}% attendance
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-6 mb-4 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
+                        <Clock className="w-4 h-4" />
+                        <span className="font-medium">Duration: {record.duration}</span>
+                      </div>
+                      <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
+                        <Users className="w-4 h-4" />
+                        <span className="font-medium">{record.attendees} participants</span>
+                      </div>
+                      <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
+                        <Award className="w-4 h-4" />
+                        <span className="font-medium">Rating: {record.rating}/5</span>
+                      </div>
+                    </div>
+
+                    {/* Attendance Bar */}
+                    <div className="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden shadow-inner">
+                      <div
+                        className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-1000 shadow-sm"
+                        style={{ width: `${(record.attendees / record.totalEnrolled) * 100}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <button className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-2 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-lg transition-colors">
+                        <Eye className="w-4 h-4" />
+                        View Details
+                      </button>
+                      <button className="text-gray-600 hover:text-gray-700 font-semibold bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors">
+                        Export Report
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Video Call Modal */}
       {videoToken && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
           <div className="w-full h-full">
-            <HMSRoomKitHost
-              token={videoToken}
-              userName={videoUserName || "Host"}
-            />
-            <button
-              onClick={() => setVideoToken(null)}
-              className="absolute top-4 right-4 bg-white text-black rounded px-4 py-2 shadow-lg z-50"
-            >
-              Close
-            </button>
+            <HMSRoomKitHost token={videoToken} userName={videoUserName || "Host"} />
           </div>
         </div>
       )}
