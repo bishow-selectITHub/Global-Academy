@@ -65,6 +65,7 @@ function App() {
   return (
     <ThemeProvider>
       <ToastProvider>
+
         <Router>
           <UserProvider>
             <Routes>
@@ -129,6 +130,7 @@ function App() {
 
           </UserProvider>
         </Router>
+
       </ToastProvider>
     </ThemeProvider>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock } from 'lucide-react';
 import Button from '../../components/ui/Button';
@@ -11,32 +11,42 @@ const Login = () => {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { login } = useUser();
+  const { login, isAuthenticated, isLoading: userLoading, user } = useUser();
+
+  useEffect(() => {
+    if (!userLoading && isAuthenticated) {
+      if (user?.role === 'superadmin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [userLoading, isAuthenticated, user, navigate]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
-    
+
     if (!email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Email is invalid';
     }
-    
+
     if (!password) {
       newErrors.password = 'Password is required';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setIsLoading(true);
-    
+
     try {
       await login(email, password);
       // Navigation will happen automatically via AuthLayout

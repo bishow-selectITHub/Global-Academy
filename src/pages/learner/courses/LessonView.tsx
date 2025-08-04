@@ -17,6 +17,8 @@ import Button from '../../../components/ui/Button';
 import { Card, CardContent } from '../../../components/ui/Card';
 import { useToast } from '../../../components/ui/Toaster';
 import { useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
+import { fetchEnrollments } from '../../../store/enrollmentsSlice';
 import { RootState } from '../../../store';
 import { supabase } from '../../../lib/supabase';
 import { useUser } from '../../../contexts/UserContext';
@@ -50,6 +52,7 @@ const LessonView = () => {
   const [notes, setNotes] = useState('');
   const { user } = useUser();
   const [hasQuiz, setHasQuiz] = useState(false);
+  const dispatch = useDispatch();
 
   // Defensive checks for slices
   const courseSlice = useSelector((state: RootState) => state.courses || { data: [] });
@@ -124,6 +127,8 @@ const LessonView = () => {
         if (error) {
           throw error;
         }
+        // Dispatch Redux action to update enrollments in the store
+        dispatch(fetchEnrollments(user.id));
       }
 
       // Update local state for instant UI feedback

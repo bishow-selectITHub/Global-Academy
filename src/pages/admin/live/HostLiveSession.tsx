@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect } from "react"
 import {
@@ -25,6 +24,9 @@ import {
   MapPin,
   GraduationCap,
   Star,
+  FileText,
+  Download,
+  X,
 } from "lucide-react"
 import { supabase } from "../../../lib/supabase"
 import { useToast } from "../../../components/ui/Toaster"
@@ -40,7 +42,7 @@ const CREATE_ROOM_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/
 const GENERATE_TOKEN_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-hms-token`
 
 const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => {
-  const [activeTab, setActiveTab] = useState<"enrolled" | "schedule" | "attendance">("enrolled")
+  const [activeTab, setActiveTab] = useState<"enrolled" | "schedule" | "attendance" | "resources">("enrolled")
   const [form, setForm] = useState({
     roomName: "",
     startDate: "",
@@ -56,6 +58,10 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   const { addToast } = useToast()
   const [videoToken, setVideoToken] = useState<string | null>(null)
   const [videoUserName, setVideoUserName] = useState<string>("")
+  const [attendanceCounts, setAttendanceCounts] = useState<{ [sessionId: string]: number }>({})
+  const [selectedSessionForAttendance, setSelectedSessionForAttendance] = useState<any | null>(null)
+  const [sessionAttendees, setSessionAttendees] = useState<any[]>([])
+  const [loadingSessionAttendees, setLoadingSessionAttendees] = useState(false)
 
   // Separate live and scheduled sessions
   const liveSessions = sessions.filter((session) => session.status === "live")
@@ -92,6 +98,42 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     },
   ]
 
+  // Mock resources data
+  const mockResources = [
+    {
+      id: 1,
+      name: "React Hooks Cheatsheet.pdf",
+      type: "PDF",
+      size: "1.2 MB",
+      date: "2024-07-20",
+      url: "/placeholder.pdf", // Placeholder URL
+    },
+    {
+      id: 2,
+      name: "Advanced CSS Techniques.docx",
+      type: "DOCX",
+      size: "850 KB",
+      date: "2024-07-18",
+      url: "/placeholder.docx", // Placeholder URL
+    },
+    {
+      id: 3,
+      name: "JavaScript ES6+ Syntax.zip",
+      type: "ZIP",
+      size: "5.5 MB",
+      date: "2024-07-15",
+      url: "/placeholder.zip", // Placeholder URL
+    },
+    {
+      id: 4,
+      name: "Course Syllabus.pdf",
+      type: "PDF",
+      size: "300 KB",
+      date: "2024-07-10",
+      url: "/placeholder.pdf", // Placeholder URL
+    },
+  ]
+
   // Keep existing useEffect hooks...
   useEffect(() => {
     const fetchSessions = async () => {
@@ -102,7 +144,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
           .select("*")
           .eq("course_id", course.id)
           .order("start_time", { ascending: false })
-
         if (error) throw error
         setSessions(data || [])
       } catch (error: any) {
@@ -116,7 +157,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         setLoadingSessions(false)
       }
     }
-
     fetchSessions()
   }, [course.id, addToast])
 
@@ -128,23 +168,17 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
           .from("course_enrollments")
           .select("user_id")
           .eq("course_id", course.id)
-
         if (enrollmentsError) throw enrollmentsError
-
         if (enrollments.length === 0) {
           setEnrolledUsers([])
           return
         }
-
         const userIds = enrollments.map((e) => e.user_id)
-
         const { data: users, error: usersError } = await supabase
           .from("users")
           .select("id, name, email, avatar")
           .in("id", userIds)
-
         if (usersError) throw usersError
-
         // Transform the data to include mock additional data for demo
         const enrichedUsers = (users || []).map((user) => ({
           ...user,
@@ -157,7 +191,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
           lastActive: "2 hours ago",
           rating: 4.5 + Math.random() * 0.5,
         }))
-
         setEnrolledUsers(enrichedUsers)
       } catch (error: any) {
         console.error("Error fetching enrolled users:", error)
@@ -171,9 +204,24 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         setLoadingEnrolled(false)
       }
     }
-
     fetchEnrolled()
   }, [course.id, addToast])
+
+  useEffect(() => {
+    const fetchAttendanceCounts = async () => {
+      if (!sessions.length) return
+      const counts: { [sessionId: string]: number } = {}
+      for (const session of sessions) {
+        const { count, error } = await supabase
+          .from("students_attendance")
+          .select("id", { count: "exact", head: true })
+          .eq("session_id", session.id)
+        counts[session.id] = count || 0
+      }
+      setAttendanceCounts(counts)
+    }
+    fetchAttendanceCounts()
+  }, [sessions])
 
   // Keep existing handlers...
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -184,31 +232,24 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
-
     try {
       const {
         data: { session },
         error: sessionError,
       } = await supabase.auth.getSession()
-
       if (sessionError || !session?.access_token) {
         throw new Error("User not authenticated")
       }
-
       if (!form.roomName.trim()) {
         throw new Error("Room name is required")
       }
-
       if (!form.startDate) {
         throw new Error("Start date is required")
       }
-
       if (!form.maxParticipants || Number.parseInt(form.maxParticipants) < 1) {
         throw new Error("Valid maximum participants number is required")
       }
-
       const roomNameToSend = form.roomName.trim()
-
       const roomResponse = await fetch(CREATE_ROOM_ENDPOINT, {
         method: "POST",
         headers: {
@@ -217,7 +258,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         },
         body: JSON.stringify({ room_name: roomNameToSend }),
       })
-
       if (!roomResponse.ok) {
         const errorText = await roomResponse.text()
         let errorData
@@ -228,13 +268,10 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         }
         throw new Error(errorData.error || "Could not create room")
       }
-
       const roomData = await roomResponse.json()
-
       if (!roomData.id) {
         throw new Error("Invalid room data received")
       }
-
       const { error: insertError } = await supabase.from("live_sessions").insert({
         course_id: course.id,
         room_id: roomData.id,
@@ -244,28 +281,23 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         description: form.description.trim() || null,
         status: "scheduled",
       })
-
       if (insertError) throw insertError
-
       addToast?.({
         type: "success",
         title: "Live session scheduled",
         message: "Room created successfully.",
       })
-
       setForm({
         roomName: "",
         startDate: "",
         maxParticipants: "50",
         description: "",
       })
-
       const { data: updatedSessions } = await supabase
         .from("live_sessions")
         .select("*")
         .eq("course_id", course.id)
         .order("start_time", { ascending: false })
-
       setSessions(updatedSessions || [])
     } catch (error: any) {
       console.error("Error scheduling session:", error)
@@ -299,20 +331,16 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
 
   const handleJoinSession = async (session: any) => {
     setJoiningSession(session.id)
-
     try {
       const {
         data: { session: authSession },
         error: sessionError,
       } = await supabase.auth.getSession()
-
       if (sessionError || !authSession?.access_token || !authSession?.user) {
         throw new Error("You must be logged in to join.")
       }
-
       const roomId = session.room_id
       const role = "host"
-
       const response = await fetch(GENERATE_TOKEN_ENDPOINT, {
         method: "POST",
         headers: {
@@ -324,14 +352,13 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
           role: role,
         }),
       })
-
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || "Failed to generate 100ms token")
       }
 
       const tokenData = await response.json()
-
+      console.log(tokenData)
       setVideoToken(tokenData.token)
       setVideoUserName(instructor)
     } catch (error: any) {
@@ -344,6 +371,64 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     } finally {
       setJoiningSession(null)
     }
+  }
+
+  const fetchSessionAttendees = async (sessionId: string) => {
+    setLoadingSessionAttendees(true)
+    try {
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from("students_attendance")
+        .select("user_id, joined_at")
+        .eq("session_id", sessionId)
+
+      if (attendanceError) throw attendanceError
+
+      if (attendanceData.length === 0) {
+        setSessionAttendees([])
+        return
+      }
+
+      const userIds = attendanceData.map((a) => a.user_id)
+      const { data: users, error: usersError } = await supabase
+        .from("users")
+        .select("id, name, email, avatar")
+        .in("id", userIds)
+
+      if (usersError) throw usersError
+
+      const enrichedAttendees = attendanceData.map((attendance) => {
+        const user = users?.find((u) => u.id === attendance.user_id)
+        return {
+          ...attendance,
+          userName: user?.name || "Unknown User",
+          userEmail: user?.email || "N/A",
+          userAvatar:
+            user?.avatar ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.email || "Unknown")}`,
+        }
+      })
+      setSessionAttendees(enrichedAttendees)
+    } catch (error: any) {
+      console.error("Error fetching session attendees:", error)
+      addToast?.({
+        type: "error",
+        title: "Error",
+        message: error.message || "Could not fetch session attendees.",
+      })
+      setSessionAttendees([])
+    } finally {
+      setLoadingSessionAttendees(false)
+    }
+  }
+
+  const handleViewAttendanceDetails = (session: any) => {
+    setSelectedSessionForAttendance(session)
+    fetchSessionAttendees(session.id)
+  }
+
+  const handleCloseAttendanceDetails = () => {
+    setSelectedSessionForAttendance(null)
+    setSessionAttendees([])
   }
 
   const instructor = course.instructor || "Dr. Jane Doe"
@@ -361,8 +446,8 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     <button
       onClick={() => setActiveTab(tab as any)}
       className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${activeTab === tab
-          ? `${color} text-white shadow-md`
-          : "bg-white text-gray-600 hover:text-gray-800 hover:bg-gray-50 border border-gray-200 hover:border-gray-300"
+        ? `${color} text-white shadow-md`
+        : "bg-white text-gray-600 hover:text-gray-800 hover:bg-gray-50 border border-gray-200 hover:border-gray-300"
         }`}
     >
       <div className={`${activeTab === tab ? "" : "opacity-70"}`}>{icon}</div>
@@ -390,7 +475,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
             <ArrowLeft className="w-5 h-5" />
             Back to Courses
           </button>
-
           {/* Course Info Header */}
           <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">
             <div className="flex items-center gap-4">
@@ -446,7 +530,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
               </div>
             </div>
           </div>
-
           {/* Navigation Tabs */}
           <div className="flex gap-6 mb-8">
             <TabButton
@@ -469,9 +552,15 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
               count={attendanceData.length}
               color="bg-gradient-to-r from-purple-500 to-pink-500"
             />
+            <TabButton
+              tab="resources"
+              icon={<FileText className="w-5 h-5" />}
+              label="Resources"
+              count={mockResources.length}
+              color="bg-gradient-to-r from-amber-500 to-orange-500"
+            />
           </div>
         </div>
-
         {/* Tab Content */}
         {activeTab === "enrolled" && (
           <div className="space-y-6">
@@ -487,7 +576,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                 <p className="text-2xl font-bold text-gray-900 mb-1">{enrolledUsers.length}</p>
                 <p className="text-xs font-medium text-blue-600">Active students</p>
               </div>
-
               <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg shadow-sm">
@@ -503,7 +591,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   <p className="text-xs font-medium text-emerald-600">+12% this week</p>
                 </div>
               </div>
-
               <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
@@ -516,7 +603,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                 </p>
                 <p className="text-xs font-medium text-purple-600">Finished course</p>
               </div>
-
               <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-sm">
@@ -530,7 +616,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                 <p className="text-xs font-medium text-amber-600">Student feedback</p>
               </div>
             </div>
-
             {/* Students List */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="flex items-center gap-3 p-6 border-b border-gray-200">
@@ -542,7 +627,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   <p className="text-gray-600 text-sm">Manage and track student progress</p>
                 </div>
               </div>
-
               {loadingEnrolled ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
@@ -600,7 +684,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                               </div>
                             </div>
                           </td>
-
                           {/* Progress */}
                           <td className="py-4 px-6">
                             <div className="w-full max-w-[120px]">
@@ -618,7 +701,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                               </div>
                             </div>
                           </td>
-
                           {/* Lessons */}
                           <td className="py-4 px-6">
                             <div className="text-center">
@@ -634,7 +716,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                               </div>
                             </div>
                           </td>
-
                           {/* Enrolled Date */}
                           <td className="py-4 px-6">
                             <div className="text-sm font-medium text-gray-900">
@@ -651,7 +732,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                               days ago
                             </div>
                           </td>
-
                           {/* Address */}
                           <td className="py-4 px-6">
                             <div className="text-sm text-gray-900 max-w-[150px]">
@@ -665,7 +745,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                               </div>
                             </div>
                           </td>
-
                           {/* Actions */}
                           <td className="py-4 px-6">
                             <div className="flex items-center gap-2">
@@ -689,7 +768,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
             </div>
           </div>
         )}
-
         {activeTab === "schedule" && (
           <div className="max-w-3xl mx-auto">
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
@@ -702,7 +780,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   <p className="text-gray-600 text-sm">Create a new live video session for your course</p>
                 </div>
               </div>
-
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-3">Session Name</label>
@@ -716,7 +793,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                     required
                   />
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-3">Start Date & Time</label>
@@ -729,7 +805,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                       required
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-3">Maximum Participants</label>
                     <input
@@ -744,7 +819,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                     />
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-3">Description (Optional)</label>
                   <textarea
@@ -756,7 +830,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                     placeholder="Brief description of what will be covered in this session..."
                   />
                 </div>
-
                 <div className="pt-6 border-t border-gray-200">
                   <button
                     type="submit"
@@ -777,7 +850,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   </button>
                 </div>
               </form>
-
               {/* Scheduled Sessions List */}
               {scheduledSessions.length > 0 && (
                 <div className="mt-8 pt-6 border-t border-gray-200">
@@ -836,7 +908,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
             </div>
           </div>
         )}
-
         {activeTab === "attendance" && (
           <div className="space-y-6">
             {/* Attendance Overview */}
@@ -848,13 +919,20 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   </div>
                   <h3 className="font-medium text-gray-900 text-sm">Avg Attendance</h3>
                 </div>
-                <p className="text-2xl font-bold text-gray-900 mb-1">87%</p>
+                <p className="text-2xl font-bold text-gray-900 mb-1">
+                  {enrolledUsers.length > 0
+                    ? `${Math.round(
+                      (Object.values(attendanceCounts).reduce((sum, count) => sum + count, 0) /
+                        (sessions.length * enrolledUsers.length || 1)) *
+                      100,
+                    )}%`
+                    : "N/A"}
+                </p>
                 <div className="flex items-center gap-1">
                   <TrendingUp className="w-3 h-3 text-purple-500" />
                   <p className="text-xs font-medium text-purple-600">+5% from last month</p>
                 </div>
               </div>
-
               <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-sm">
@@ -862,10 +940,9 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   </div>
                   <h3 className="font-medium text-gray-900 text-sm">Total Sessions</h3>
                 </div>
-                <p className="text-2xl font-bold text-gray-900 mb-1">{attendanceData.length}</p>
+                <p className="text-2xl font-bold text-gray-900 mb-1">{sessions.length}</p>
                 <p className="text-xs font-medium text-blue-600">This month</p>
               </div>
-
               <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg shadow-sm">
@@ -876,7 +953,6 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                 <p className="text-2xl font-bold text-gray-900 mb-1">12.5h</p>
                 <p className="text-xs font-medium text-emerald-600">Live session time</p>
               </div>
-
               <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-sm">
@@ -888,87 +964,293 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                 <p className="text-xs font-medium text-amber-600">Session feedback</p>
               </div>
             </div>
-
-            {/* Attendance Records */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
-                  <Activity className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Session Attendance Records</h2>
-                  <p className="text-gray-600 text-sm">Detailed attendance for each live session</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {attendanceData.map((record) => (
-                  <div
-                    key={record.id}
-                    className="border border-gray-200 rounded-xl p-4 hover:bg-gradient-to-r hover:from-gray-50 hover:to-purple-50 hover:border-purple-200 transition-all duration-200 shadow-sm hover:shadow-md"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h3 className="text-base font-bold text-gray-900">{record.sessionName}</h3>
-                        <p className="text-gray-600 font-medium text-sm">
-                          {new Date(record.date).toLocaleDateString("en-US", {
+            {/* Conditional Rendering for Session List vs. Detailed Attendance */}
+            {selectedSessionForAttendance ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3 p-6 border-b border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
+                      <UserCheck className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900">
+                        Attendance for: {selectedSessionForAttendance.room_name}
+                      </h2>
+                      <p className="text-gray-600 text-sm">
+                        {selectedSessionForAttendance.start_time
+                          ? new Date(selectedSessionForAttendance.start_time).toLocaleDateString("en-US", {
                             weekday: "long",
                             year: "numeric",
                             month: "long",
                             day: "numeric",
-                          })}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-gray-900">
-                          {record.attendees}/{record.totalEnrolled}
-                        </div>
-                        <div className="text-sm font-semibold text-purple-600">
-                          {Math.round((record.attendees / record.totalEnrolled) * 100)}% attendance
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-6 mb-4 text-sm text-gray-600">
-                      <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
-                        <Clock className="w-4 h-4" />
-                        <span className="font-medium">Duration: {record.duration}</span>
-                      </div>
-                      <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
-                        <Users className="w-4 h-4" />
-                        <span className="font-medium">{record.attendees} participants</span>
-                      </div>
-                      <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
-                        <Award className="w-4 h-4" />
-                        <span className="font-medium">Rating: {record.rating}/5</span>
-                      </div>
-                    </div>
-
-                    {/* Attendance Bar */}
-                    <div className="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden shadow-inner">
-                      <div
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-1000 shadow-sm"
-                        style={{ width: `${(record.attendees / record.totalEnrolled) * 100}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <button className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-2 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-lg transition-colors">
-                        <Eye className="w-4 h-4" />
-                        View Details
-                      </button>
-                      <button className="text-gray-600 hover:text-gray-700 font-semibold bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors">
-                        Export Report
-                      </button>
+                          })
+                          : "N/A"}
+                      </p>
                     </div>
                   </div>
-                ))}
+                  <button
+                    onClick={handleCloseAttendanceDetails}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                {loadingSessionAttendees ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
+                  </div>
+                ) : sessionAttendees.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900 mb-2">No Attendees Recorded</h3>
+                    <p className="text-gray-600 text-sm mb-6 max-w-md mx-auto">
+                      No attendance records found for this session yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Student</th>
+                          <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Joined At</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {sessionAttendees.map((attendee, index) => (
+                          <tr
+                            key={attendee.user_id}
+                            className={`hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 transition-all duration-200 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                              }`}
+                          >
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={attendee.userAvatar || "/placeholder.svg"}
+                                  alt={attendee.userName}
+                                  className="w-10 h-10 rounded-lg object-cover border-2 border-gray-100"
+                                />
+                                <div>
+                                  <h3 className="font-semibold text-gray-900 text-sm">{attendee.userName}</h3>
+                                  <p className="text-gray-600 text-xs">{attendee.userEmail}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-sm text-gray-700">
+                              {new Date(attendee.joined_at).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
+                    <Activity className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">Session Attendance Records</h2>
+                    <p className="text-gray-600 text-sm">Detailed attendance for each live session</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {sessions.map((session) => {
+                    const attendancePercentage =
+                      enrolledUsers.length > 0 ? ((attendanceCounts[session.id] || 0) / enrolledUsers.length) * 100 : 0
+                    return (
+                      <div
+                        key={session.room_id}
+                        className="border border-gray-200 rounded-xl p-4 hover:bg-gradient-to-r hover:from-gray-50 hover:to-purple-50 hover:border-purple-200 transition-all duration-200 shadow-sm hover:shadow-md"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h3 className="text-base font-bold text-gray-900">{session.room_name}</h3>
+                            <p className="text-gray-600 font-medium text-sm">
+                              {session.start_time
+                                ? new Date(session.start_time).toLocaleDateString("en-US", {
+                                  weekday: "long",
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                })
+                                : "N/A"}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xl font-bold text-gray-900">
+                              {attendanceCounts[session.id] ?? "..."} / {enrolledUsers.length}
+                            </div>
+                            <div className="text-sm font-semibold text-purple-600">
+                              {enrolledUsers.length > 0 ? `${Math.round(attendancePercentage)}% attendance` : "N/A"}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6 mb-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
+                            <Clock className="w-4 h-4" />
+                            <span className="font-medium">Duration: N/A</span>
+                          </div>
+                          <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
+                            <Users className="w-4 h-4" />
+                            <span className="font-medium">{session.max_participants} participants</span>
+                          </div>
+                          <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
+                            <Award className="w-4 h-4" />
+                            <span className="font-medium">Rating: N/A</span>
+                          </div>
+                        </div>
+                        {/* Attendance Bar */}
+                        <div className="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden shadow-inner">
+                          <div
+                            className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-1000 shadow-sm"
+                            style={{ width: `${attendancePercentage}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => handleViewAttendanceDetails(session)}
+                            className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-2 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-lg transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                            View Details
+                          </button>
+                          <button className="text-gray-600 hover:text-gray-700 font-semibold bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors">
+                            Export Report
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {activeTab === "resources" && (
+          <div className="space-y-6">
+            {/* Resources Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-sm">
+                    <FileText className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Total Resources</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">{mockResources.length}</p>
+                <p className="text-xs font-medium text-amber-600">Available for students</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-sm">
+                    <Download className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Total Downloads</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">150+</p>
+                <p className="text-xs font-medium text-blue-600">Across all resources</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg shadow-sm">
+                    <Clock className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Last Updated</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">2 days ago</p>
+                <p className="text-xs font-medium text-emerald-600">Most recent file</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
+                    <Users className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">Active Users</h3>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mb-1">90%</p>
+                <p className="text-xs font-medium text-purple-600">Engaging with resources</p>
+              </div>
+            </div>
+            {/* Resources List */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-3 p-6 border-b border-gray-200">
+                <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-sm">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Course Resources</h2>
+                  <p className="text-gray-600 text-sm">Notes, files, and supplementary materials</p>
+                </div>
+              </div>
+              {mockResources.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">No Resources Available</h3>
+                  <p className="text-gray-600 text-sm mb-6 max-w-md mx-auto">
+                    No resources have been uploaded for this course yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">File Name</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Type</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Size</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Date Added</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {mockResources.map((resource, index) => (
+                        <tr
+                          key={resource.id}
+                          className={`hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 transition-all duration-200 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                            }`}
+                        >
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-gray-500" />
+                              <span className="font-medium text-gray-900">{resource.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-6 text-sm text-gray-700">{resource.type}</td>
+                          <td className="py-4 px-6 text-sm text-gray-700">{resource.size}</td>
+                          <td className="py-4 px-6 text-sm text-gray-700">{resource.date}</td>
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={resource.url}
+                                download
+                                className="bg-amber-50 hover:bg-amber-100 text-amber-600 p-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                              >
+                                <Download className="w-4 h-4" />
+                                Download
+                              </a>
+                              <button className="bg-gray-50 hover:bg-gray-100 text-gray-600 p-2 rounded-lg text-xs font-medium transition-colors">
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
-
       {/* Video Call Modal */}
       {videoToken && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">

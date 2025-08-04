@@ -137,7 +137,7 @@ const LearnerDashboard = () => {
   const { user } = useUser()
   const courses = useSelector((state: RootState) => state.courses.data)
   const enrollments = useSelector((state: RootState) => state.enrollments.data)
-  const loading = useSelector((state: RootState) => state.enrollments.loading)
+  const loading = useSelector((state: RootState) => state.users.loading)
   const { addToast } = useToast()
   const navigate = useNavigate()
 
