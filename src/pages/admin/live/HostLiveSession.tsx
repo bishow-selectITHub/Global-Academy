@@ -1,6 +1,6 @@
 "use client"
-import type React from "react"
-import { useState, useEffect } from "react"
+import React from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   ArrowLeft,
   Copy,
@@ -24,7 +24,6 @@ import {
   MapPin,
   GraduationCap,
   Star,
-  FileText,
   Download,
   X,
 } from "lucide-react"
@@ -40,9 +39,10 @@ interface HostLiveSessionProps {
 // API Constants
 const CREATE_ROOM_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-hms-room`
 const GENERATE_TOKEN_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-hms-token`
+const FETCH_RECORDINGS_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-hms-recordings`
 
 const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => {
-  const [activeTab, setActiveTab] = useState<"enrolled" | "schedule" | "attendance" | "resources">("enrolled")
+  const [activeTab, setActiveTab] = useState<"enrolled" | "schedule" | "attendance" | "recordings">("enrolled")
   const [form, setForm] = useState({
     roomName: "",
     startDate: "",
@@ -51,21 +51,35 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   })
   const [submitting, setSubmitting] = useState(false)
   const [sessions, setSessions] = useState<any[]>([])
-  const [loadingSessions, setLoadingSessions] = useState(true)
+  // const [loadingSessions, setLoadingSessions] = useState(true)
   const [enrolledUsers, setEnrolledUsers] = useState<any[]>([])
   const [loadingEnrolled, setLoadingEnrolled] = useState(true)
   const [joiningSession, setJoiningSession] = useState<string | null>(null)
   const { addToast } = useToast()
   const [videoToken, setVideoToken] = useState<string | null>(null)
   const [videoUserName, setVideoUserName] = useState<string>("")
+  const [currentSessionData, setCurrentSessionData] = useState<{ roomId: string; sessionId: string } | null>(null)
   const [attendanceCounts, setAttendanceCounts] = useState<{ [sessionId: string]: number }>({})
   const [selectedSessionForAttendance, setSelectedSessionForAttendance] = useState<any | null>(null)
   const [sessionAttendees, setSessionAttendees] = useState<any[]>([])
   const [loadingSessionAttendees, setLoadingSessionAttendees] = useState(false)
+  const [pendingRoomId, setPendingRoomId] = useState<string | null>(null)
+  const hostLiveRoomIdRef = useRef<string | null>(null)
+  const hostHmsRoomIdRef = useRef<string | null>(null)
+  const hasPersistedRef = useRef<boolean>(false)
+  const isPersistingRef = useRef<boolean>(false)
+  const persistFallbackTimerRef = useRef<number | null>(null)
+  // Per-student details expansion and attendance
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
+  const [userAttendanceMap, setUserAttendanceMap] = useState<Record<string, any[]>>({})
+  const [loadingUserAttendance, setLoadingUserAttendance] = useState<Record<string, boolean>>({})
 
   // Separate live and scheduled sessions
   const liveSessions = sessions.filter((session) => session.status === "live")
   const scheduledSessions = sessions.filter((session) => session.status === "scheduled")
+
+  const [recordings, setRecordings] = useState<any[]>([])
+  const [loadingRecordings, setLoadingRecordings] = useState(false)
 
   // Mock attendance data (replace with real data later)
   const attendanceData = [
@@ -98,49 +112,13 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     },
   ]
 
-  // Mock resources data
-  const mockResources = [
-    {
-      id: 1,
-      name: "React Hooks Cheatsheet.pdf",
-      type: "PDF",
-      size: "1.2 MB",
-      date: "2024-07-20",
-      url: "/placeholder.pdf", // Placeholder URL
-    },
-    {
-      id: 2,
-      name: "Advanced CSS Techniques.docx",
-      type: "DOCX",
-      size: "850 KB",
-      date: "2024-07-18",
-      url: "/placeholder.docx", // Placeholder URL
-    },
-    {
-      id: 3,
-      name: "JavaScript ES6+ Syntax.zip",
-      type: "ZIP",
-      size: "5.5 MB",
-      date: "2024-07-15",
-      url: "/placeholder.zip", // Placeholder URL
-    },
-    {
-      id: 4,
-      name: "Course Syllabus.pdf",
-      type: "PDF",
-      size: "300 KB",
-      date: "2024-07-10",
-      url: "/placeholder.pdf", // Placeholder URL
-    },
-  ]
 
   // Keep existing useEffect hooks...
   useEffect(() => {
     const fetchSessions = async () => {
-      setLoadingSessions(true)
       try {
         const { data, error } = await supabase
-          .from("live_sessions")
+          .from("live_rooms")
           .select("*")
           .eq("course_id", course.id)
           .order("start_time", { ascending: false })
@@ -154,7 +132,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
           message: "Could not fetch live sessions.",
         })
       } finally {
-        setLoadingSessions(false)
+        // no session loading UI currently
       }
     }
     fetchSessions()
@@ -164,30 +142,50 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     const fetchEnrolled = async () => {
       setLoadingEnrolled(true)
       try {
+        // Fetch enrollments for this course with user_id and progress
         const { data: enrollments, error: enrollmentsError } = await supabase
           .from("course_enrollments")
-          .select("user_id")
+          .select("user_id, progress, lessons, enrolled_at, created_at")
           .eq("course_id", course.id)
+
         if (enrollmentsError) throw enrollmentsError
-        if (enrollments.length === 0) {
+        if (!enrollments || enrollments.length === 0) {
           setEnrolledUsers([])
           return
         }
-        const userIds = enrollments.map((e) => e.user_id)
+
+        // Map user_id to enrollment-based fields
+        const progressByUserId: Record<string, number> = {}
+        const lessonsByUid: Record<string, number> = {}
+        const enrolledAtByUserId: Record<string, string | null> = {}
+
+        const userIds = enrollments.map((e) => {
+          progressByUserId[e.user_id] = typeof e.progress ? e.progress : 0
+          lessonsByUid[e.user_id] = Array.isArray(e.lessons) ? e.lessons.length : 0
+          const enrolled = (e as any).enrolled_at ?? (e as any).created_at ?? null
+          enrolledAtByUserId[e.user_id] = enrolled
+          return e.user_id
+        })
+
+
+
+
+        // Fetch user profiles for the enrolled users
         const { data: users, error: usersError } = await supabase
           .from("users")
-          .select("id, name, email, avatar")
+          .select("id, name, email, avatar,location,phone")
           .in("id", userIds)
         if (usersError) throw usersError
-        // Transform the data to include mock additional data for demo
+
+        // Enrich users with their enrollment progress from course_enrollments
         const enrichedUsers = (users || []).map((user) => ({
           ...user,
-          enrolledAt: new Date().toISOString(), // Mock enrollment date
-          progress: Math.floor(Math.random() * 100), // Mock progress
-          location: "New York, USA",
-          phone: "+1 (555) 123-4567",
-          completedLessons: Math.floor(Math.random() * 10),
-          totalLessons: 10,
+          enrolledAt: enrolledAtByUserId[user.id],
+          progress: progressByUserId[user.id] ?? 0,
+          location: user.location,
+          phone: user.phone,
+          completedLessons: lessonsByUid[user.id] ?? 0,
+          totalLessons: (course as any)?.lessons?.length ?? 0,
           lastActive: "2 hours ago",
           rating: 4.5 + Math.random() * 0.5,
         }))
@@ -212,7 +210,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       if (!sessions.length) return
       const counts: { [sessionId: string]: number } = {}
       for (const session of sessions) {
-        const { count, error } = await supabase
+        const { count } = await supabase
           .from("students_attendance")
           .select("id", { count: "exact", head: true })
           .eq("session_id", session.id)
@@ -222,6 +220,114 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     }
     fetchAttendanceCounts()
   }, [sessions])
+
+  useEffect(() => {
+    if (activeTab !== "recordings") return
+    if (!sessions || sessions.length === 0) return
+    // Sync and then load recordings whenever the tab opens and sessions are available
+    void syncAndLoadRecordings()
+  }, [activeTab, sessions])
+
+  // Debug effect to track videoToken changes
+  useEffect(() => {
+    if (videoToken) {
+      console.log("🚀 [DEBUG] videoToken changed:", {
+        hasToken: !!videoToken,
+        tokenLength: videoToken.length,
+        pendingRoomId
+      })
+    }
+  }, [videoToken, pendingRoomId])
+
+  const loadRoomRecordings = async () => {
+    // Load recordings saved in room_sessions for all sessions of this course
+    const sessionIds = sessions.map((s) => s.id)
+    if (sessionIds.length === 0) {
+      setRecordings([])
+      return
+    }
+    const { data, error } = await supabase
+      .from("room_sessions")
+      .select("room_id, recordings, created_at")
+      .in("room_id", sessionIds)
+      .not("recordings", "is", null)
+
+    if (error) throw error
+
+    const recordingsList: any[] = []
+      ; (data || []).forEach((roomSession: any) => {
+        const sessionMeta = sessions.find((s) => s.id === roomSession.room_id)
+        const roomName = sessionMeta?.room_name || "Untitled Session"
+        if (roomSession.recordings && roomSession.recordings.length > 0) {
+          roomSession.recordings.forEach((rec: any) => {
+            recordingsList.push({ ...rec, room_name: roomName })
+          })
+        }
+      })
+
+    // Newest first by created_at in recording, fallback to session created_at
+    recordingsList.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    setRecordings(recordingsList)
+  }
+
+  const syncAndLoadRecordings = async () => {
+    setLoadingRecordings(true)
+    try {
+      const {
+        data: { session: authSession },
+      } = await supabase.auth.getSession()
+      if (!authSession?.access_token) {
+        throw new Error("User not authenticated")
+      }
+
+      // Trigger the Edge Function for each session to pull latest recordings from 100ms
+      const requests = sessions.map((s) =>
+        fetch(FETCH_RECORDINGS_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authSession.access_token}`,
+          },
+          body: JSON.stringify({ room_id: s.id }),
+        })
+      )
+      const results = await Promise.allSettled(requests)
+
+      // Surface any hard failures in logs but don't block loading
+      results.forEach(async (r, idx) => {
+        const sess = sessions[idx]
+        if (r.status === "fulfilled") {
+          try {
+            const res = r.value
+            const text = await res.text()
+            console.log("fetch-hms-recordings response", {
+              session_id: sess?.id,
+              ok: res.ok,
+              status: res.status,
+              body: text,
+            })
+          } catch (e) {
+            console.log("fetch-hms-recordings response parse error", e)
+          }
+        } else {
+          console.warn("fetch-hms-recordings error for session", sess?.id, r.reason)
+        }
+      })
+
+      // After syncing, load what is stored in room_sessions
+      await loadRoomRecordings()
+    } catch (error: any) {
+      console.error("Error syncing/loading recordings:", error)
+      addToast?.({
+        type: "error",
+        title: "Error",
+        message: error?.message || "Could not fetch session recordings.",
+      })
+    } finally {
+      setLoadingRecordings(false)
+    }
+  }
+
 
   // Keep existing handlers...
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -272,7 +378,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       if (!roomData.id) {
         throw new Error("Invalid room data received")
       }
-      const { error: insertError } = await supabase.from("live_sessions").insert({
+      const { error: insertError } = await supabase.from("live_rooms").insert({
         course_id: course.id,
         room_id: roomData.id,
         room_name: form.roomName.trim(),
@@ -294,7 +400,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         description: "",
       })
       const { data: updatedSessions } = await supabase
-        .from("live_sessions")
+        .from("live_rooms")
         .select("*")
         .eq("course_id", course.id)
         .order("start_time", { ascending: false })
@@ -329,9 +435,107 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     }
   }
 
+  // Session identifiers in 100ms are not used; align our session_id with room_id
+
+  function formatEnrollmentDate(value: unknown): string {
+    if (!value) return "—";
+    if (typeof value === "string") {
+      // Handles 'YYYY-MM-DD' or ISO strings like 'YYYY-MM-DDTHH:mm:ss.sssZ'
+      return value.length >= 10 ? value.slice(0, 10) : new Date(value).toISOString().slice(0, 10);
+    }
+    try {
+      return new Date(value as any).toISOString().slice(0, 10);
+    } catch {
+      return "—";
+    }
+  }
+
+  function formatRelativeFromNow(value: unknown): string {
+    if (!value) return "—";
+    const date = typeof value === "string" ? new Date(value) : new Date(value as any);
+    if (isNaN(date.getTime())) return "—";
+    const now = new Date();
+
+    // Years precise by month/day
+    let years = now.getFullYear() - date.getFullYear();
+    const hasNotHadAnniversaryThisYear =
+      now.getMonth() < date.getMonth() || (now.getMonth() === date.getMonth() && now.getDate() < date.getDate());
+    if (hasNotHadAnniversaryThisYear) years -= 1;
+    if (years >= 1) return `${years} year${years > 1 ? 's' : ''} ago`;
+
+    // Months precise by calendar months
+    const totalNowMonths = now.getFullYear() * 12 + now.getMonth();
+    const totalThenMonths = date.getFullYear() * 12 + date.getMonth();
+    let months = totalNowMonths - totalThenMonths;
+    if (now.getDate() < date.getDate()) months -= 1;
+    if (months >= 1) return `${months} month${months > 1 ? 's' : ''} ago`;
+
+    // Days
+    const ms = Date.now() - date.getTime();
+    const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+    if (days <= 0) return "today";
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+  }
+
+  async function fetchUserAttendance(userId: string) {
+    setLoadingUserAttendance((prev) => ({ ...prev, [userId]: true }))
+    try {
+      // Fetch attendance for this user
+      const { data: attendance, error: attendanceError } = await supabase
+        .from("students_attendance")
+        .select("session_id, joined_at")
+        .eq("user_id", userId)
+        .order("joined_at", { ascending: false })
+      if (attendanceError) throw attendanceError
+
+      let enriched = attendance || []
+
+      // If some rows are missing room_id, try to resolve via room_sessions by session_id
+
+
+      // Resolve room names from live_rooms using room_id
+      const roomIds = Array.from(new Set(enriched.map((a) => a.session_id).filter(Boolean))) as string[]
+      if (roomIds.length > 0) {
+        const { data: rooms, error: roomsErr } = await supabase
+          .from("live_rooms")
+          .select("id, room_name")
+          .in("id", roomIds)
+        if (!roomsErr && rooms) {
+          const nameById = new Map<string, string>()
+          rooms.forEach((r) => nameById.set(r.id, r.room_name))
+          enriched = enriched.map((a) => ({ ...a, room_name: nameById.get(a.session_id) }))
+        }
+      }
+
+      setUserAttendanceMap((prev) => ({ ...prev, [userId]: enriched }))
+    } catch (err) {
+      console.error("Error fetching user attendance:", err)
+      setUserAttendanceMap((prev) => ({ ...prev, [userId]: [] }))
+    } finally {
+      setLoadingUserAttendance((prev) => ({ ...prev, [userId]: false }))
+    }
+  }
+
+  const handleToggleUserDetails = async (userId: string) => {
+    if (expandedUserId === userId) {
+      setExpandedUserId(null)
+      return
+    }
+    setExpandedUserId(userId)
+    if (!userAttendanceMap[userId]) {
+      await fetchUserAttendance(userId)
+    }
+  }
+
   const handleJoinSession = async (session: any) => {
     setJoiningSession(session.id)
     try {
+      console.log("🚀 [DEBUG] handleJoinSession called with session:", {
+        sessionId: session.id,
+        sessionRoomId: session.room_id,
+        sessionData: session
+      })
+
       const {
         data: { session: authSession },
         error: sessionError,
@@ -350,6 +554,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         body: JSON.stringify({
           room_id: roomId,
           role: role,
+          wait_for_active_session: false,
         }),
       })
       if (!response.ok) {
@@ -358,9 +563,87 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       }
 
       const tokenData = await response.json()
-      console.log(tokenData)
+      console.log("🚀 [DEBUG] Token generated successfully:", {
+        token: tokenData.token ? "TOKEN_RECEIVED" : "NO_TOKEN",
+        roomId,
+        role
+      })
+
+      // Persist the live_rooms.id synchronously to avoid state race
+      hostLiveRoomIdRef.current = session.id
+      hostHmsRoomIdRef.current = session.room_id
       setVideoToken(tokenData.token)
       setVideoUserName(instructor)
+      // Track which live_rooms.id we're about to run as host
+      setPendingRoomId(session.id)
+      console.log("🚀 [DEBUG] pendingRoomId set to:", session.id)
+
+      // Fallback persist after join: poll for an active session id and persist if onSessionStarted didn't run
+      try {
+        if (persistFallbackTimerRef.current) {
+          clearTimeout(persistFallbackTimerRef.current)
+          persistFallbackTimerRef.current = null
+        }
+        persistFallbackTimerRef.current = window.setTimeout(async () => {
+          if (hasPersistedRef.current || isPersistingRef.current) {
+            console.log("[DEBUG] Fallback skipped; already persisted or persisting")
+            return
+          }
+          try {
+            console.log("[DEBUG] Fallback polling for active 100ms session…")
+            const {
+              data: { session: authSession },
+            } = await supabase.auth.getSession()
+            if (!authSession?.access_token) return
+            const res = await fetch(GENERATE_TOKEN_ENDPOINT, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authSession.access_token}`,
+              },
+              body: JSON.stringify({ room_id: session.room_id, role: "host", wait_for_active_session: true }),
+            })
+            const js = await res.json().catch(() => ({}))
+            const fallbackSessionId = js?.session_id || js?.sessionInstanceId
+            console.log("[DEBUG] Fallback token response:", { ok: res.ok, fallbackSessionId })
+            const roomIdToUse = hostLiveRoomIdRef.current || session.id
+            if (fallbackSessionId && roomIdToUse) {
+              isPersistingRef.current = true
+              const { data: existing } = await supabase
+                .from("room_sessions")
+                .select("session_id")
+                .eq("session_id", fallbackSessionId)
+                .maybeSingle()
+              if (!existing) {
+                const { data, error } = await supabase
+                  .from("room_sessions")
+                  .insert({ room_id: roomIdToUse, session_id: fallbackSessionId, active: true })
+                  .select("id")
+                  .single()
+                if (!error && data?.id) {
+                  console.log("[DEBUG] Fallback persisted room_sessions row", data.id)
+                  setCurrentSessionData({ roomId: roomIdToUse, sessionId: data.id })
+                  hasPersistedRef.current = true
+                } else {
+                  console.warn("[DEBUG] Fallback persist failed", error)
+                }
+              } else {
+                console.log("[DEBUG] Fallback found existing room_sessions row; skipping insert")
+              }
+            }
+          } catch (e) {
+            console.warn("[DEBUG] Fallback polling error", e)
+          } finally {
+            isPersistingRef.current = false
+          }
+        }, 7000)
+      } catch (_) {
+        // ignore fallback error
+      }
+
+      // Do not pre-save using a possibly ended session id; wait for onSessionStarted
+
+
     } catch (error: any) {
       console.error("Error joining session:", error)
       addToast?.({
@@ -553,10 +836,10 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
               color="bg-gradient-to-r from-purple-500 to-pink-500"
             />
             <TabButton
-              tab="resources"
-              icon={<FileText className="w-5 h-5" />}
-              label="Resources"
-              count={mockResources.length}
+              tab="recordings"
+              icon={<Video className="w-5 h-5" />}
+              label="Recordings"
+              count={recordings.length}
               color="bg-gradient-to-r from-amber-500 to-orange-500"
             />
           </div>
@@ -656,110 +939,144 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {enrolledUsers.map((student, index) => (
-                        <tr
-                          key={student.id}
-                          className={`hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                            }`}
-                        >
-                          {/* Student Info */}
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={
-                                  student.avatar ||
-                                  `https://ui-avatars.com/api/?name=${encodeURIComponent(student.name || student.email)}`
-                                }
-                                alt={student.name}
-                                className="w-10 h-10 rounded-lg object-cover border-2 border-gray-100"
-                              />
-                              <div>
-                                <h3 className="font-semibold text-gray-900 text-sm">{student.name || "Anonymous"}</h3>
-                                <p className="text-gray-600 text-xs">{student.email}</p>
-                                <div className="flex items-center gap-1 mt-1">
-                                  <Star className="w-3 h-3 text-amber-400 fill-current" />
-                                  <span className="text-xs font-medium text-gray-700">{student.rating.toFixed(1)}</span>
-                                  <span className="text-gray-400 mx-1">•</span>
-                                  <span className="text-xs text-gray-500">{student.lastActive}</span>
+                        <React.Fragment key={student.id}>
+                          <tr
+                            key={`${student.id}-main`}
+                            className={`hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                          >
+                            {/* Student Info */}
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={
+                                    student.avatar ||
+                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(student.name || student.email)}`
+                                  }
+                                  alt={student.name}
+                                  className="w-10 h-10 rounded-lg object-cover border-2 border-gray-100"
+                                />
+                                <div>
+                                  <h3 className="font-semibold text-gray-900 text-sm">{student.name || "Anonymous"}</h3>
+                                  <p className="text-gray-600 text-xs">{student.email}</p>
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <Star className="w-3 h-3 text-amber-400 fill-current" />
+                                    <span className="text-xs font-medium text-gray-700">{student.rating.toFixed(1)}</span>
+                                    <span className="text-gray-400 mx-1">•</span>
+                                    <span className="text-xs text-gray-500">{student.lastActive}</span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </td>
-                          {/* Progress */}
-                          <td className="py-4 px-6">
-                            <div className="w-full max-w-[120px]">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs font-bold text-gray-900">{student.progress}%</span>
+                            </td>
+                            {/* Progress */}
+                            <td className="py-4 px-6">
+                              <div className="w-full max-w-[120px]">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs font-bold text-gray-900">{student.progress}%</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                  <div
+                                    className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-500"
+                                    style={{ width: `${student.progress}%` }}
+                                  />
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {student.progress >= 100 ? "Completed" : "In Progress"}
+                                </div>
                               </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                                <div
-                                  className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-500"
-                                  style={{ width: `${student.progress}%` }}
-                                />
+                            </td>
+                            {/* Lessons */}
+                            <td className="py-4 px-6">
+                              <div className="text-center">
+                                <div className="text-sm font-bold text-gray-900">
+                                  {student.completedLessons}/{student.totalLessons}
+                                </div>
+                                <div className="text-xs text-gray-500">lessons</div>
+                                <div className="w-full bg-gray-200 rounded-full h-1 mt-2 overflow-hidden">
+                                  <div
+                                    className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                                    style={{ width: `${(student.completedLessons / student.totalLessons) * 100}%` }}
+                                  />
+                                </div>
                               </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                {student.progress >= 100 ? "Completed" : "In Progress"}
+                            </td>
+                            {/* Enrolled Date */}
+                            <td className="py-4 px-6">
+                              <div className="text-sm font-medium text-gray-900">
+                                {formatEnrollmentDate(student.enrolledAt)}
                               </div>
-                            </div>
-                          </td>
-                          {/* Lessons */}
-                          <td className="py-4 px-6">
-                            <div className="text-center">
-                              <div className="text-sm font-bold text-gray-900">
-                                {student.completedLessons}/{student.totalLessons}
+                              <div className="text-xs text-gray-500">
+                                {formatRelativeFromNow(student.enrolledAt)}
                               </div>
-                              <div className="text-xs text-gray-500">lessons</div>
-                              <div className="w-full bg-gray-200 rounded-full h-1 mt-2 overflow-hidden">
-                                <div
-                                  className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                                  style={{ width: `${(student.completedLessons / student.totalLessons) * 100}%` }}
-                                />
+                            </td>
+                            {/* Address */}
+                            <td className="py-4 px-6">
+                              <div className="text-sm text-gray-900 max-w-[150px]">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <MapPin className="w-3 h-3 text-gray-500" />
+                                  <span className="truncate">{student.location}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Phone className="w-3 h-3 text-gray-500" />
+                                  <span className="text-xs text-gray-600">{student.phone}</span>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          {/* Enrolled Date */}
-                          <td className="py-4 px-6">
-                            <div className="text-sm font-medium text-gray-900">
-                              {new Date(student.enrolledAt).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {Math.floor(
-                                (new Date().getTime() - new Date(student.enrolledAt).getTime()) / (1000 * 60 * 60 * 24),
-                              )}{" "}
-                              days ago
-                            </div>
-                          </td>
-                          {/* Address */}
-                          <td className="py-4 px-6">
-                            <div className="text-sm text-gray-900 max-w-[150px]">
-                              <div className="flex items-center gap-1 mb-1">
-                                <MapPin className="w-3 h-3 text-gray-500" />
-                                <span className="truncate">{student.location}</span>
+                            </td>
+                            {/* Actions */}
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-2">
+                                <button className="bg-blue-50 hover:bg-blue-100 text-blue-600 p-2 rounded-lg text-xs font-medium transition-colors">
+                                  <Mail className="w-4 h-4" />
+                                </button>
+                                <button
+                                  className="bg-gray-50 hover:bg-gray-100 text-gray-600 p-2 rounded-lg text-xs font-medium transition-colors"
+                                  onClick={() => handleToggleUserDetails(student.id)}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                                <button className="bg-gray-50 hover:bg-gray-100 text-gray-600 p-2 rounded-lg text-xs font-medium transition-colors">
+                                  <MoreVertical className="w-4 h-4" />
+                                </button>
                               </div>
-                              <div className="flex items-center gap-1">
-                                <Phone className="w-3 h-3 text-gray-500" />
-                                <span className="text-xs text-gray-600">{student.phone}</span>
-                              </div>
-                            </div>
-                          </td>
-                          {/* Actions */}
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-2">
-                              <button className="bg-blue-50 hover:bg-blue-100 text-blue-600 p-2 rounded-lg text-xs font-medium transition-colors">
-                                <Mail className="w-4 h-4" />
-                              </button>
-                              <button className="bg-gray-50 hover:bg-gray-100 text-gray-600 p-2 rounded-lg text-xs font-medium transition-colors">
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              <button className="bg-gray-50 hover:bg-gray-100 text-gray-600 p-2 rounded-lg text-xs font-medium transition-colors">
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                          </tr>
+                          {expandedUserId === student.id && (
+                            <tr key={`${student.id}-details`} className="bg-gray-50/60">
+                              <td colSpan={6} className="py-4 px-6">
+                                <div className="space-y-3">
+                                  <div className="text-sm font-semibold text-gray-900">Attendance</div>
+                                  {loadingUserAttendance[student.id] ? (
+                                    <div className="text-sm text-gray-500">Loading attendance...</div>
+                                  ) : (userAttendanceMap[student.id] || []).length === 0 ? (
+                                    <div className="text-sm text-gray-500">No attendance records for this student.</div>
+                                  ) : (
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-sm">
+                                        <thead className="bg-white border-b border-gray-200">
+                                          <tr>
+                                            <th className="text-left py-2 px-3 font-medium text-gray-700">Room</th>
+                                            <th className="text-left py-2 px-3 font-medium text-gray-700">Session</th>
+                                            <th className="text-left py-2 px-3 font-medium text-gray-700">Date</th>
+                                            <th className="text-left py-2 px-3 font-medium text-gray-700">Relative</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {(userAttendanceMap[student.id] || []).map((a, i) => (
+                                            <tr key={i} className="border-b border-gray-200">
+                                              <td className="py-2 px-3 text-gray-800">{a.room_name || '—'}</td>
+                                              <td className="py-2 px-3 text-gray-800">{a.room_name || a.session_id || '—'}</td>
+                                              <td className="py-2 px-3 text-gray-800">{formatEnrollmentDate(a.joined_at)}</td>
+                                              <td className="py-2 px-3 text-gray-500">{formatRelativeFromNow(a.joined_at)}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
@@ -1132,70 +1449,39 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
             )}
           </div>
         )}
-        {activeTab === "resources" && (
+        {activeTab === "recordings" && (
           <div className="space-y-6">
-            {/* Resources Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-sm">
-                    <FileText className="w-4 h-4 text-white" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 text-sm">Total Resources</h3>
-                </div>
-                <p className="text-2xl font-bold text-gray-900 mb-1">{mockResources.length}</p>
-                <p className="text-xs font-medium text-amber-600">Available for students</p>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-sm">
-                    <Download className="w-4 h-4 text-white" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 text-sm">Total Downloads</h3>
-                </div>
-                <p className="text-2xl font-bold text-gray-900 mb-1">150+</p>
-                <p className="text-xs font-medium text-blue-600">Across all resources</p>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg shadow-sm">
-                    <Clock className="w-4 h-4 text-white" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 text-sm">Last Updated</h3>
-                </div>
-                <p className="text-2xl font-bold text-gray-900 mb-1">2 days ago</p>
-                <p className="text-xs font-medium text-emerald-600">Most recent file</p>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
-                    <Users className="w-4 h-4 text-white" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 text-sm">Active Users</h3>
-                </div>
-                <p className="text-2xl font-bold text-gray-900 mb-1">90%</p>
-                <p className="text-xs font-medium text-purple-600">Engaging with resources</p>
-              </div>
-            </div>
-            {/* Resources List */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="flex items-center gap-3 p-6 border-b border-gray-200">
                 <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-sm">
-                  <FileText className="w-5 h-5 text-white" />
+                  <Video className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Course Resources</h2>
-                  <p className="text-gray-600 text-sm">Notes, files, and supplementary materials</p>
+                  <h2 className="text-lg font-bold text-gray-900">Session Recordings</h2>
+                  <p className="text-gray-600 text-sm">All recorded live sessions for this course</p>
+                </div>
+                <div className="ml-auto">
+                  <button
+                    onClick={() => void syncAndLoadRecordings()}
+                    disabled={loadingRecordings || sessions.length === 0}
+                    className="bg-amber-50 hover:bg-amber-100 disabled:opacity-60 text-amber-700 px-3 py-2 rounded-lg text-xs font-semibold border border-amber-200"
+                  >
+                    {loadingRecordings ? "Syncing…" : "Sync recordings"}
+                  </button>
                 </div>
               </div>
-              {mockResources.length === 0 ? (
+              {loadingRecordings ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-amber-500 border-t-transparent"></div>
+                </div>
+              ) : recordings.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl flex items-center justify-center mx-auto mb-4">
-                    <FileText className="w-8 h-8 text-gray-400" />
+                    <Video className="w-8 h-8 text-gray-400" />
                   </div>
-                  <h3 className="text-base font-semibold text-gray-900 mb-2">No Resources Available</h3>
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">No Recordings Available</h3>
                   <p className="text-gray-600 text-sm mb-6 max-w-md mx-auto">
-                    No resources have been uploaded for this course yet.
+                    Live sessions that have ended will appear here automatically.
                   </p>
                 </div>
               ) : (
@@ -1203,42 +1489,48 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">File Name</th>
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Type</th>
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Size</th>
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Date Added</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Session Name</th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Date</th>
                         <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {mockResources.map((resource, index) => (
+                      {recordings.map((recording, index) => (
                         <tr
-                          key={resource.id}
-                          className={`hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 transition-all duration-200 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                            }`}
+                          key={recording.id}
+                          className={`hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 transition-all duration-200 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
                         >
                           <td className="py-4 px-6">
-                            <div className="flex items-center gap-3">
-                              <FileText className="w-5 h-5 text-gray-500" />
-                              <span className="font-medium text-gray-900">{resource.name}</span>
-                            </div>
+                            <span className="font-medium text-gray-900">{recording.room_name || "Untitled Session"}</span>
                           </td>
-                          <td className="py-4 px-6 text-sm text-gray-700">{resource.type}</td>
-                          <td className="py-4 px-6 text-sm text-gray-700">{resource.size}</td>
-                          <td className="py-4 px-6 text-sm text-gray-700">{resource.date}</td>
+                          <td className="py-4 px-6 text-sm text-gray-700">
+                            {new Date(recording.created_at).toLocaleDateString()}
+                          </td>
                           <td className="py-4 px-6">
                             <div className="flex items-center gap-2">
-                              <a
-                                href={resource.url}
-                                download
-                                className="bg-amber-50 hover:bg-amber-100 text-amber-600 p-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                              >
-                                <Download className="w-4 h-4" />
-                                Download
-                              </a>
-                              <button className="bg-gray-50 hover:bg-gray-100 text-gray-600 p-2 rounded-lg text-xs font-medium transition-colors">
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
+                              {recording.url ? (
+                                <>
+                                  <a
+                                    href={recording.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="bg-amber-50 hover:bg-amber-100 text-amber-600 p-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                                  >
+                                    <Play className="w-4 h-4" />
+                                    Watch
+                                  </a>
+                                  <a
+                                    href={recording.url}
+                                    download
+                                    className="bg-gray-50 hover:bg-gray-100 text-gray-600 p-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                    Download
+                                  </a>
+                                </>
+                              ) : (
+                                <span className="text-xs text-gray-500">Unavailable</span>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1254,8 +1546,164 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       {/* Video Call Modal */}
       {videoToken && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
-          <div className="w-full h-full">
-            <HMSRoomKitHost token={videoToken} userName={videoUserName || "Host"} />
+          <div className="w-full h-full relative">
+            {/* End Session Button */}
+            {/*<button
+              onClick={handleEndSession}
+              className="absolute top-4 right-4 z-10 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg"
+            >
+              <X className="w-4 h-4" />
+              End Session
+            </button> */}
+
+            <HMSRoomKitHost
+              token={videoToken}
+              userName={videoUserName || "Host"}
+              onSessionStarted={async (hmsSessionId, hmsRoomId) => {
+                try {
+                  if (hasPersistedRef.current || isPersistingRef.current) {
+                    console.log("[DEBUG] Skipping duplicate onSessionStarted persist")
+                    return
+                  }
+                  isPersistingRef.current = true
+                  console.log("🚀 [DEBUG] onSessionStarted called with:", {
+                    hmsSessionId,
+                    hmsRoomId,
+                    pendingRoomId
+                  })
+
+                  // Use the pendingRoomId (from live_rooms.id) which we know
+                  // We also have the new session ID from 100ms
+                  const room_id = hostLiveRoomIdRef.current || pendingRoomId || (hmsRoomId ? (sessions.find((s) => s.room_id === hmsRoomId)?.id ?? null) : null)
+                  if (!room_id) {
+                    console.error("❌ Error: Live Room ID is missing. pendingRoomId:", pendingRoomId)
+                    isPersistingRef.current = false
+                    return
+                  }
+
+                  // Fetch the current user to get their ID
+                  const { data: { user } } = await supabase.auth.getUser()
+                  if (!user) {
+                    console.error("❌ Error: User not authenticated.")
+                    return
+                  }
+
+                  console.log("🚀 [DEBUG] Insert data for room_sessions:", {
+                    room_id,
+                    hmsSessionId,
+                    active: true,
+                    userId: user.id
+                  })
+
+                  // Safely create or re-activate without requiring a DB unique index
+                  let newRoomSession: { id: string } | null = null
+                  let roomSessionError: any = null
+                  try {
+                    const { data: existing } = await supabase
+                      .from("room_sessions")
+                      .select("session_id")
+                      .eq("session_id", hmsSessionId)
+                      .maybeSingle()
+                    console.log("Existing Data:", existing)
+                    if (!existing) {
+                      const { data, error } = await supabase
+                        .from("room_sessions")
+                        .insert({ room_id: room_id, session_id: hmsSessionId, active: true })
+                        .select("id")
+                        .single()
+                      newRoomSession = data as any
+                      roomSessionError = error
+                    } else {
+                      newRoomSession = null
+                    }
+                  } catch (err) {
+                    roomSessionError = err
+                  }
+
+                  if (roomSessionError) {
+                    console.error("❌ Error creating room session:", roomSessionError)
+                    addToast?.({
+                      type: "error",
+                      title: "Database Error",
+                      message: "Failed to start room session in the database.",
+                    })
+                    return
+                  }
+
+                  // Update the local state with the new session data
+                  const createdId = newRoomSession?.id
+                  if (createdId) {
+                    setCurrentSessionData({ roomId: room_id, sessionId: createdId })
+                  }
+                  console.log("✅ Supabase insertion successful:", {
+                    roomSessionId: createdId,
+                    roomId: room_id,
+                    hmsSessionId: hmsSessionId
+                  })
+
+                  // Also update the status of the parent `live_rooms` table to 'live'
+                  const { error: updateError } = await supabase
+                    .from("live_rooms")
+                    .update({ status: 'live' })
+                    .eq("id", room_id)
+
+                  if (updateError) {
+                    console.error("❌ Error updating live_rooms status:", updateError)
+                  } else {
+                    console.log("✅ live_rooms status updated to 'live' for room:", room_id)
+                  }
+                  hasPersistedRef.current = true
+                } catch (e: any) {
+                  console.error("Failed to start session and update database:", e.message)
+                  addToast?.({
+                    type: "error",
+                    title: "Error",
+                    message: "Failed to start session properly.",
+                  })
+                } finally {
+                  isPersistingRef.current = false
+                }
+              }}
+              onRoomEnd={async () => {
+                if (persistFallbackTimerRef.current) {
+                  clearTimeout(persistFallbackTimerRef.current)
+                  persistFallbackTimerRef.current = null
+                }
+                if (currentSessionData) {
+                  try {
+                    // Update the room_sessions table to mark it as inactive
+                    await supabase
+                      .from("room_sessions")
+                      .update({ active: false })
+                      .eq("id", currentSessionData.sessionId)
+                      .eq("room_id", currentSessionData.roomId)
+
+                    // Also update the status of the parent `live_rooms` table to 'completed'
+                    await supabase
+                      .from("live_rooms")
+                      .update({ status: 'completed' })
+                      .eq("id", currentSessionData.roomId)
+
+                    console.log("Session ended and database updated.")
+                  } catch (error: any) {
+                    console.error("Error ending session:", error)
+                    addToast?.({
+                      type: "error",
+                      title: "Error",
+                      message: "Failed to end session properly.",
+                    })
+                  }
+                }
+                setVideoToken(null)
+                setVideoUserName("")
+                setCurrentSessionData(null)
+                addToast?.({
+                  type: "success",
+                  title: "Session Ended",
+                  message: "Live session has been ended successfully.",
+                })
+              }}
+            />
           </div>
         </div>
       )}

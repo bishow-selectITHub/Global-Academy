@@ -30,6 +30,9 @@ interface CourseState {
 export const fetchCourses = createAsyncThunk(
     'courses/fetchCourses',
     async (_, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { data, error } = await supabase.from('courses').select('*,enrollments:course_enrollments(count)');
         if (error) return rejectWithValue(error.message);
         return data;
@@ -39,6 +42,9 @@ export const fetchCourses = createAsyncThunk(
 export const fetchCourseById = createAsyncThunk(
     'courses/fetchCourseById',
     async (courseId: string, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { data, error } = await supabase
             .from('courses')
             .select('*,enrollments:course_enrollments(count)')
@@ -52,6 +58,9 @@ export const fetchCourseById = createAsyncThunk(
 export const createCourse = createAsyncThunk(
     'courses/createCourse',
     async (courseData: Partial<Course>, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { data, error } = await supabase
             .from('courses')
             .insert([courseData])
@@ -65,6 +74,9 @@ export const createCourse = createAsyncThunk(
 export const updateCourse = createAsyncThunk(
     'courses/updateCourse',
     async ({ id, courseData }: { id: string; courseData: Partial<Course> }, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { data, error } = await supabase
             .from('courses')
             .update(courseData)
@@ -79,6 +91,9 @@ export const updateCourse = createAsyncThunk(
 export const deleteCourse = createAsyncThunk(
     'courses/deleteCourse',
     async (courseId: string, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { error } = await supabase
             .from('courses')
             .delete()

@@ -25,6 +25,9 @@ interface QuizState {
 export const fetchQuizzes = createAsyncThunk(
     'quizzes/fetchQuizzes',
     async (_, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { data, error } = await supabase.from('quizes').select('*');
         if (error) return rejectWithValue(error.message);
         return data;
@@ -34,6 +37,9 @@ export const fetchQuizzes = createAsyncThunk(
 export const fetchQuizByCourseId = createAsyncThunk(
     'quizzes/fetchQuizByCourseId',
     async (courseId: string, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { data, error } = await supabase
             .from('quizes')
             .select('*')
@@ -47,6 +53,9 @@ export const fetchQuizByCourseId = createAsyncThunk(
 export const createQuiz = createAsyncThunk(
     'quizzes/createQuiz',
     async (quizData: Partial<Quiz>, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { data, error } = await supabase
             .from('quizes')
             .insert([quizData])
@@ -60,6 +69,9 @@ export const createQuiz = createAsyncThunk(
 export const updateQuiz = createAsyncThunk(
     'quizzes/updateQuiz',
     async ({ id, quizData }: { id: string; quizData: Partial<Quiz> }, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { data, error } = await supabase
             .from('quizes')
             .update(quizData)
@@ -74,6 +86,9 @@ export const updateQuiz = createAsyncThunk(
 export const deleteQuiz = createAsyncThunk(
     'quizzes/deleteQuiz',
     async (quizId: string, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { error } = await supabase
             .from('quizes')
             .delete()

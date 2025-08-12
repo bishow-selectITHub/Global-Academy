@@ -24,7 +24,6 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const LearnerLayout = () => {
   const { user, logout } = useUser();
-  console.log(user);
   const { theme, setTheme } = useTheme();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -51,7 +50,7 @@ const LearnerLayout = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
       {/* Top Bar */}
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10 w-full">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 fixed  w-full">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -154,16 +153,16 @@ const LearnerLayout = () => {
         </div>
       )}
 
-      <div className="flex-1 flex">
+      <div className=" flex w-full mt-16 ">
         {/* Left Sidebar - Desktop Only */}
         <aside
-          className={`hidden h-screen sticky top-0 left-0 md:flex md:flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-300 ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'
+          className={`hidden  h-screen fixed md:flex md:flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-300 ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'
             }`}
         >
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-            <div className={`flex items-center ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
+            <div className={`flex  items-center ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
               {!sidebarCollapsed && (
-                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Navigation</h2>
+                <h2 className="text-lg  font-semibold text-slate-800 dark:text-slate-100">Navigation</h2>
               )}
             </div>
             <button
@@ -235,7 +234,7 @@ const LearnerLayout = () => {
         </aside>
 
         {/* Main Content */}
-        <main className={`flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-slate-900 dark:text-slate-100  
+        <main className={`flex-1 ml-64 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-slate-900 dark:text-slate-100  
           `}>
 
           <Outlet />

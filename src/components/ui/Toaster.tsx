@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useRef, useCallback } from 'react';
 import { X, CheckCircle, AlertTriangle, Info, AlertCircle } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -9,6 +9,8 @@ interface Toast {
   title: string;
   message?: string;
   duration?: number;
+  dedupeKey?: string;
+  throttleMs?: number;
 }
 
 interface ToastContextType {
@@ -29,15 +31,65 @@ export const useToast = () => {
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const lastShownRef = useRef<Record<string, number>>({});
 
-  const addToast = (toast: Omit<Toast, 'id'>) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { ...toast, id }]);
-  };
-
-  const removeToast = (id: string) => {
+  const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
+  }, []);
+
+  const addToast = useCallback((toast: Omit<Toast, 'id'>) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    const key = isOffline && toast.type === 'error'
+      ? 'network-offline-error'
+      : (toast.dedupeKey || `${toast.type}|${toast.title}|${toast.message || ''}`);
+    const throttleMs = isOffline && toast.type === 'error' ? Math.max(30000, toast.throttleMs ?? 0) : (toast.throttleMs ?? 8000);
+    const now = Date.now();
+    const lastShown = lastShownRef.current[key] ?? 0;
+
+    if (now - lastShown < throttleMs) {
+      return;
+    }
+
+    lastShownRef.current[key] = now;
+    setToasts((prev) => [...prev, { ...toast, id } as Toast]);
+  }, []);
+
+  useEffect(() => {
+    const handleOffline = () => {
+      addToast({
+        type: 'warning',
+        title: 'You are offline',
+        message: 'Some features may not work until connection is restored.',
+        duration: 5000,
+        dedupeKey: 'network-offline',
+        throttleMs: 30000,
+      });
+    };
+
+    const handleOnline = () => {
+      addToast({
+        type: 'success',
+        title: 'Back online',
+        message: 'Your connection has been restored.',
+        duration: 3000,
+        dedupeKey: 'network-online',
+        throttleMs: 30000,
+      });
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      handleOffline();
+    }
+
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [addToast]);
 
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast }}>

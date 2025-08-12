@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase';
 export const fetchEnrollments = createAsyncThunk(
     'enrollments/fetchEnrollments',
     async (userId: string, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { data, error } = await supabase
             .from('course_enrollments')
             .select('*, course:courses(*)') // join the courses table

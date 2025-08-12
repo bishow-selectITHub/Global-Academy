@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase';
 export const fetchCurrentUser = createAsyncThunk(
     'user/fetchCurrentUser',
     async (_, { rejectWithValue }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) return rejectWithValue(sessionError.message);
         if (!sessionData?.session) return null;

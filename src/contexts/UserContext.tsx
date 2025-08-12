@@ -1,22 +1,21 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/Toaster';
 
-// Types
 export type UserRole = 'superadmin' | 'learner';
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  avatar:string;
+  avatar: string;
   role: UserRole;
 }
 
 interface UserContextType {
   user: User | null;
-
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
@@ -40,7 +39,7 @@ interface UserProviderProps {
 
 export const UserProvider = ({ children }: UserProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { addToast } = useToast();
 
@@ -88,7 +87,6 @@ export const UserProvider = ({ children }: UserProviderProps) => {
               avatar: userData.user.user_metadata?.avatar || '',
               name: userData.user.user_metadata?.name || ''
             });
-            console.log(userData.user.user_metadata?.avatar)
           }
         }
       } catch (err) {
@@ -101,7 +99,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     fetchUser();
   }, [navigate]);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
       // Sign in with Supabase
@@ -150,9 +148,9 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [navigate]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.signOut();
@@ -178,9 +176,9 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [addToast, navigate]);
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = useCallback(async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
       // Sign up with Supabase (store name in user_metadata)
@@ -244,16 +242,17 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [addToast, navigate]);
 
   const value = useMemo(() => ({
     user,
+    isLoading,
     login,
     logout,
     register,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'superadmin'
-  }), [user, login, logout, register]);
+  }), [user, isLoading, login, logout, register]);
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 };

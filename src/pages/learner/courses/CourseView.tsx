@@ -19,7 +19,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 
 import { supabase } from '../../../lib/supabase';
-import { HMSRoomProvider } from "@100mslive/react-sdk";
+import { HMSRoomProvider, useHMSStore, selectIsConnectedToRoom, selectRoom } from "@100mslive/react-sdk";
 import { HMSPrebuilt } from "@100mslive/roomkit-react";
 
 const GENERATE_TOKEN_ENDPOINT = "https://smqnaddacvwwuehxymbr.supabase.co/functions/v1/generate-hms-token";
@@ -33,6 +33,22 @@ interface LiveSessionModalProps {
     roomId: string;
 }
 
+const SessionLogger = () => {
+    const isConnected = useHMSStore(selectIsConnectedToRoom);
+    const room = useHMSStore(selectRoom);
+    const loggedRef = React.useRef(false);
+
+    React.useEffect(() => {
+        if (!loggedRef.current && isConnected && room?.sessionId) {
+            loggedRef.current = true;
+            // Log the joined session's instance id
+            console.log("100ms session_id (learner join):", room.sessionId);
+        }
+    }, [isConnected, room?.sessionId]);
+
+    return null;
+};
+
 const LiveSessionModal = ({ open, onClose, token, userId, roomId }: LiveSessionModalProps) => {
     if (!open) return null;
     return (
@@ -40,7 +56,10 @@ const LiveSessionModal = ({ open, onClose, token, userId, roomId }: LiveSessionM
             <div className="w-full h-full relative">
 
                 {token ? (
-                    <HMSPrebuilt authToken={token} userName={userId} />
+                    <>
+                        <SessionLogger />
+                        <HMSPrebuilt authToken={token} userName={userId} />
+                    </>
                 ) : (
                     <div className="flex items-center justify-center h-full text-white text-lg">Joining live session...</div>
                 )}
@@ -53,12 +72,14 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
     const [sessions, setSessions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [joinModal, setJoinModal] = useState<{ open: boolean, token: string | null, userId: string, roomId: string } | null>(null);
+    const [activeSession, setActiveSession] = useState(null)
+
 
     useEffect(() => {
         const fetchSessions = async () => {
             setLoading(true);
             const { data, error } = await supabase
-                .from('live_sessions')
+                .from('live_rooms')
                 .select('*')
                 .eq('course_id', courseId)
                 .order('start_time', { ascending: false });
@@ -67,6 +88,8 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
         };
         fetchSessions();
     }, [courseId]);
+
+
 
     const handleJoinSession = async (session: any) => {
         const sessionResponse = await supabase.auth.getSession();
@@ -79,6 +102,20 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
         }
 
         try {
+            // Try to get active session_id from room_sessions for this room
+            let activeSessionId: string | null = null;
+            try {
+                const { data: activeRow } = await supabase
+                    .from('room_sessions')
+                    .select('session_id')
+                    .eq('room_id', session.room_id)
+                    .eq('active', 'TRUE')
+                    .maybeSingle();
+                activeSessionId = activeRow?.session_id || null;
+            } catch (_) {
+                // ignore, will fallback below
+            }
+
             const res = await fetch(GENERATE_TOKEN_ENDPOINT, {
                 method: 'POST',
                 headers: {
@@ -89,18 +126,22 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
                     user_id: user.id,
                     room_id: session.room_id,
                     role: 'guest',
+                    wait_for_active_session: true,
                 }),
             });
             const data = await res.json();
-            console.log(data.sessionInstanceId)
+            console.log("🚀 [APP][HMS] learner token response:", { sessionId: data.session_id || data.sessionInstanceId, roomId: session.room_id })
             if (!res.ok) throw new Error(data.error || 'Failed to generate 100ms token');
 
-            // Insert attendance record
+            // Determine the real session id to record attendance under
+            const realSessionId = activeSessionId || data.session_id || data.sessionInstanceId || session.id;
+
+            // Insert attendance record using the real session id
             const { error: attendanceError } = await supabase
                 .from('students_attendance')
                 .insert([
                     {
-                        session_id: session.id, // using session.id as session_id
+                        session_id: realSessionId,
                         user_id: user.id,
                         joined_at: new Date().toISOString(),
                     }
