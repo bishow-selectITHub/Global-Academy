@@ -51,6 +51,8 @@ const SessionLogger = () => {
 
 const LiveSessionModal = ({ open, onClose, token, userId, roomId }: LiveSessionModalProps) => {
     if (!open) return null;
+    // Cast Prebuilt to any to accommodate prop differences across versions
+    const Prebuilt: any = HMSPrebuilt as unknown as any;
     return (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center">
             <div className="w-full h-full relative">
@@ -58,7 +60,7 @@ const LiveSessionModal = ({ open, onClose, token, userId, roomId }: LiveSessionM
                 {token ? (
                     <>
                         <SessionLogger />
-                        <HMSPrebuilt authToken={token} userName={userId} />
+                        <Prebuilt authToken={token} userName={userId} />
                     </>
                 ) : (
                     <div className="flex items-center justify-center h-full text-white text-lg">Joining live session...</div>
@@ -72,7 +74,6 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
     const [sessions, setSessions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [joinModal, setJoinModal] = useState<{ open: boolean, token: string | null, userId: string, roomId: string } | null>(null);
-    const [activeSession, setActiveSession] = useState(null)
 
 
     useEffect(() => {
@@ -109,7 +110,7 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
                     .from('room_sessions')
                     .select('session_id')
                     .eq('room_id', session.room_id)
-                    .eq('active', 'TRUE')
+                    .eq('active', true)
                     .maybeSingle();
                 activeSessionId = activeRow?.session_id || null;
             } catch (_) {
@@ -134,21 +135,31 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
             if (!res.ok) throw new Error(data.error || 'Failed to generate 100ms token');
 
             // Determine the real session id to record attendance under
-            const realSessionId = activeSessionId || data.session_id || data.sessionInstanceId || session.id;
-
-            // Insert attendance record using the real session id
-            const { error: attendanceError } = await supabase
-                .from('students_attendance')
-                .insert([
-                    {
-                        session_id: realSessionId,
-                        user_id: user.id,
-                        joined_at: new Date().toISOString(),
+            const realSessionId = activeSessionId || data.session_id || data.sessionInstanceId;
+            console.log(realSessionId)
+            // Insert attendance record once per (user_id, session_id)
+            if (realSessionId) {
+                const { data: existing, error: fetchExistingError } = await supabase
+                    .from('students_attendance')
+                    .select('id')
+                    .eq('session_id', realSessionId)
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+                if (!existing && !fetchExistingError) {
+                    const { error: attendanceError } = await supabase
+                        .from('students_attendance')
+                        .insert([
+                            {
+                                session_id: realSessionId,
+                                room_id: session.id,
+                                user_id: user.id,
+                                joined_at: new Date().toISOString(),
+                            }
+                        ]);
+                    if (attendanceError) {
+                        console.error('Attendance insert error:', attendanceError);
                     }
-                ]);
-            if (attendanceError) {
-                console.error('Attendance insert error:', attendanceError);
-                // Optionally show a toast or alert
+                }
             }
 
             setJoinModal({ open: true, token: data.token, userId: user.id, roomId: session.room_id });
@@ -212,13 +223,13 @@ const CourseView = () => {
     const enrollmentSlice = useSelector((state: RootState) => state.enrollments || { data: [] });
     const quizSlice = useSelector((state: RootState) => state.quizzes || { data: [] });
 
-    const course = courseSlice.data.find((c: any) => c.id === id);
+    const course = courseSlice.data.find((c: any) => c.id === id) as any;
     console.log(course);
-    const enrollment = enrollmentSlice.data.find((e: any) => e.course?.id === id);
+    const enrollment = enrollmentSlice.data.find((e: any) => e.course?.id === id) as any;
     console.log(enrollment)
-    const quiz = quizSlice.data.find((q: any) => q.course_id === id);
+    const quiz = quizSlice.data.find((q: any) => q.course_id === id) as any;
 
-    const quizScore = enrollment?.quizScore;
+    const quizScore: any = enrollment?.quizScore;
     const isEnrolled = !!enrollment;
     const progress = enrollment?.progress || 0;
     const userLessons = course?.lessons || [];
@@ -286,7 +297,7 @@ const CourseView = () => {
                         <span className="mx-2">•</span>
                         <span className="flex items-center">
                             <Users size={16} className="mr-1" />
-                            {course.enrolled} enrolled
+                            {(course as any).enrolled || 0} enrolled
                         </span>
                     </div>
                 </div>
@@ -365,7 +376,7 @@ const CourseView = () => {
                                     <div>
                                         <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">What You'll Learn</h3>
                                         <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300">
-                                            {course.objectives.map((objective: string, index: number) => (
+                                            {(course.objectives || []).map((objective: string, index: number) => (
                                                 <li key={index} className="flex items-start">
                                                     <CheckCircle size={16} className="text-green-500 mr-2 mt-1 flex-shrink-0" />
                                                     <span>{objective}</span>
@@ -384,7 +395,7 @@ const CourseView = () => {
                                             />
                                             <div>
                                                 <h4 className="font-bold text-slate-800 dark:text-slate-200">{course.instructor}</h4>
-                                                <p className="text-sm text-slate-500 dark:text-slate-400">{course.instructorTitle}</p>
+                                                <p className="text-sm text-slate-500 dark:text-slate-400">{course.instructor_title}</p>
                                             </div>
                                         </div>
                                     </div>

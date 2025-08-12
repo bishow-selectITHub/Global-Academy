@@ -213,7 +213,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         const { count } = await supabase
           .from("students_attendance")
           .select("id", { count: "exact", head: true })
-          .eq("session_id", session.id)
+          .eq("room_id", session.id)
         counts[session.id] = count || 0
       }
       setAttendanceCounts(counts)
@@ -674,7 +674,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       const { data: attendanceData, error: attendanceError } = await supabase
         .from("students_attendance")
         .select("user_id, joined_at")
-        .eq("session_id", sessionId)
+        .eq("room_id", sessionId)
 
       if (attendanceError) throw attendanceError
 
