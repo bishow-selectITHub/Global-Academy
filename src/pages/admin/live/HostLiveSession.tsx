@@ -26,6 +26,8 @@ import {
   Star,
   Download,
   X,
+  FileText,
+  Upload,
 } from "lucide-react"
 import { supabase } from "../../../lib/supabase"
 import { useToast } from "../../../components/ui/Toaster"
@@ -42,7 +44,7 @@ const GENERATE_TOKEN_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/
 const FETCH_RECORDINGS_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-hms-recordings`
 
 const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => {
-  const [activeTab, setActiveTab] = useState<"enrolled" | "schedule" | "attendance" | "recordings">("enrolled")
+  const [activeTab, setActiveTab] = useState<"enrolled" | "schedule" | "attendance" | "recordings" | "notes">("enrolled")
   const [form, setForm] = useState({
     roomName: "",
     startDate: "",
@@ -61,6 +63,9 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   const [currentSessionData, setCurrentSessionData] = useState<{ roomId: string; sessionId: string } | null>(null)
   const [attendanceCounts, setAttendanceCounts] = useState<{ [sessionId: string]: number }>({})
   const [selectedSessionForAttendance, setSelectedSessionForAttendance] = useState<any | null>(null)
+  const [roomSessionsMap, setRoomSessionsMap] = useState<Record<string, any[]>>({})
+  const [sessionAttendanceCounts, setSessionAttendanceCounts] = useState<Record<string, number>>({})
+  const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null)
   const [sessionAttendees, setSessionAttendees] = useState<any[]>([])
   const [loadingSessionAttendees, setLoadingSessionAttendees] = useState(false)
   const [pendingRoomId, setPendingRoomId] = useState<string | null>(null)
@@ -80,37 +85,17 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
 
   const [recordings, setRecordings] = useState<any[]>([])
   const [loadingRecordings, setLoadingRecordings] = useState(false)
+  // Notes (course assets)
+  const [notes, setNotes] = useState<Array<{ id?: string; name: string; size?: number; path: string; url?: string }>>([])
+  const [loadingNotes, setLoadingNotes] = useState(false)
+  const [uploadingNotes, setUploadingNotes] = useState(false)
+  const [showNoteModal, setShowNoteModal] = useState(false)
+  const [noteName, setNoteName] = useState("")
+  const [noteFile, setNoteFile] = useState<File | null>(null)
+  const [noteError, setNoteError] = useState<string | null>(null)
 
   // Mock attendance data (replace with real data later)
-  const attendanceData = [
-    {
-      id: 1,
-      sessionName: "Introduction to React",
-      date: "2024-01-15",
-      attendees: 24,
-      totalEnrolled: 30,
-      duration: "1h 45m",
-      rating: 4.8,
-    },
-    {
-      id: 2,
-      sessionName: "Advanced JavaScript",
-      date: "2024-01-12",
-      attendees: 28,
-      totalEnrolled: 32,
-      duration: "2h 15m",
-      rating: 4.9,
-    },
-    {
-      id: 3,
-      sessionName: "CSS Grid & Flexbox",
-      date: "2024-01-10",
-      attendees: 22,
-      totalEnrolled: 28,
-      duration: "1h 30m",
-      rating: 4.7,
-    },
-  ]
+
 
 
   // Keep existing useEffect hooks...
@@ -205,21 +190,53 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     fetchEnrolled()
   }, [course.id, addToast])
 
+  // Load room_sessions for all rooms and compute per-session and per-room attendance counts
   useEffect(() => {
-    const fetchAttendanceCounts = async () => {
-      if (!sessions.length) return
-      const counts: { [sessionId: string]: number } = {}
-      for (const session of sessions) {
-        const { count } = await supabase
-          .from("students_attendance")
-          .select("id", { count: "exact", head: true })
-          .eq("room_id", session.id)
-        counts[session.id] = count || 0
+    if (activeTab !== "attendance") return
+    if (!sessions.length) return
+    const load = async () => {
+      try {
+        const roomIds = sessions.map((s) => s.id)
+        const { data: roomSessions, error } = await supabase
+          .from("room_sessions")
+          .select("room_id, session_id, created_at, active")
+          .in("room_id", roomIds)
+          .order("created_at", { ascending: false })
+        if (error) throw error
+        const map: Record<string, any[]> = {}
+          ; (roomSessions || []).forEach((rs: any) => {
+            if (!map[rs.room_id]) map[rs.room_id] = []
+            map[rs.room_id].push(rs)
+          })
+        setRoomSessionsMap(map)
+
+        // Compute per-session attendance counts (students_attendance filtered by session_id)
+        const perSessionCounts: Record<string, number> = {}
+        for (const rs of roomSessions || []) {
+          const { count } = await supabase
+            .from("students_attendance")
+            .select("id", { count: "exact", head: true })
+            .eq("session_id", rs.session_id)
+          perSessionCounts[rs.session_id] = count || 0
+        }
+        setSessionAttendanceCounts(perSessionCounts)
+
+        // Aggregate totals per room
+        const perRoomTotals: Record<string, number> = {}
+        for (const rs of roomSessions || []) {
+          const add = perSessionCounts[rs.session_id] || 0
+          perRoomTotals[rs.room_id] = (perRoomTotals[rs.room_id] || 0) + add
+        }
+        setAttendanceCounts(perRoomTotals)
+      } catch (e) {
+        console.warn("Failed to load attendance counts:", e)
+        setRoomSessionsMap({})
+        setSessionAttendanceCounts({})
+        setAttendanceCounts({})
       }
-      setAttendanceCounts(counts)
     }
-    fetchAttendanceCounts()
-  }, [sessions])
+    void load()
+  }, [activeTab, sessions])
 
   useEffect(() => {
     if (activeTab !== "recordings") return
@@ -227,6 +244,11 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     // Sync and then load recordings whenever the tab opens and sessions are available
     void syncAndLoadRecordings()
   }, [activeTab, sessions])
+
+  useEffect(() => {
+    if (activeTab !== "notes") return
+    void loadCourseNotes()
+  }, [activeTab])
 
   // Debug effect to track videoToken changes
   useEffect(() => {
@@ -325,6 +347,148 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       })
     } finally {
       setLoadingRecordings(false)
+    }
+  }
+
+  // Course Notes helpers
+  const NOTES_BUCKET = "course-assets"
+  const notesPrefix = `course-notes/${course.id}`
+
+  const loadCourseNotes = async () => {
+    setLoadingNotes(true)
+    try {
+      const buildUrls = async (items: Array<{ id?: string; name: string; path: string; size?: number }>) => {
+        return await Promise.all(items.map(async (it) => {
+          let url: string | undefined
+          try {
+            const { data: pub } = await supabase.storage.from(NOTES_BUCKET).getPublicUrl(it.path)
+            url = pub?.publicUrl || undefined
+          } catch (_) {
+            // ignore
+          }
+          if (!url) {
+            try {
+              const { data: signed } = await supabase.storage.from(NOTES_BUCKET).createSignedUrl(it.path, 60 * 60)
+              url = signed?.signedUrl || undefined
+            } catch (_) {
+              // ignore
+            }
+          }
+          return { ...it, url }
+        }))
+      }
+
+      // Try loading from notes table first
+      try {
+        const { data: noteRows } = await supabase
+          .from("notes")
+          .select("id, file_url, name, created_at")
+          .eq("course_id", course.id)
+          .order("created_at", { ascending: false })
+        if (noteRows && noteRows.length > 0) {
+          const mapped = noteRows.map((r: any) => ({
+            id: r.id,
+            name: r.name || (r.file_url?.split("/").pop() ?? "file"),
+            path: r.file_url,
+          }))
+          const withUrls = await buildUrls(mapped)
+          setNotes(withUrls)
+          return
+        }
+      } catch (_) {
+        // If table doesn't exist or RLS prevents read, fall back to storage listing
+      }
+
+      const { data, error } = await supabase.storage
+        .from(NOTES_BUCKET)
+        .list(notesPrefix, { limit: 100, sortBy: { column: "name", order: "asc" } })
+      if (error) throw error
+      if (data && data.length > 0) {
+        const mapped = (data || []).map((f: any) => ({ name: f.name, size: (f as any)?.metadata?.size || (f as any)?.size, path: `${notesPrefix}/${f.name}` }))
+        const withUrls = await buildUrls(mapped)
+        setNotes(withUrls)
+      } else {
+        const { data: rootData, error: rootErr } = await supabase.storage
+          .from(NOTES_BUCKET)
+          .list("course-notes", { limit: 100, sortBy: { column: "name", order: "asc" } })
+        if (rootErr) throw rootErr
+        const mappedRoot = (rootData || []).map((f: any) => ({ name: f.name, size: (f as any)?.metadata?.size || (f as any)?.size, path: `course-notes/${f.name}` }))
+        const withUrls = await buildUrls(mappedRoot)
+        setNotes(withUrls)
+      }
+    } catch (e) {
+      console.error("Failed to load course notes:", e)
+      setNotes([])
+    } finally {
+      setLoadingNotes(false)
+    }
+  }
+
+  // removed legacy bulk upload handler (replaced with modal-based create)
+
+  const handleCreateNote = async () => {
+    setNoteError(null)
+    if (!noteName.trim()) {
+      setNoteError("Please enter a file name")
+      return
+    }
+    if (!noteFile) {
+      setNoteError("Please choose a file")
+      return
+    }
+    setUploadingNotes(true)
+    try {
+      const safeName = `${Date.now()}_${noteFile.name}`
+      const path = `${notesPrefix}/${safeName}`
+      const { error: uploadError } = await supabase.storage.from(NOTES_BUCKET).upload(path, noteFile, { upsert: false })
+      if (uploadError) {
+        setNoteError(uploadError.message || "Upload failed")
+        return
+      }
+      try {
+        await supabase.from("notes").insert({ course_id: course.id, file_url: path, name: noteName.trim() })
+      } catch (_) {
+        // Ignore if table missing; storage upload still succeeded
+      }
+      setShowNoteModal(false)
+      setNoteName("")
+      setNoteFile(null)
+      await loadCourseNotes()
+      addToast?.({ type: "success", title: "Uploaded", message: "Note uploaded successfully." })
+    } finally {
+      setUploadingNotes(false)
+    }
+  }
+
+  const handleDeleteNote = async (path: string, id?: string) => {
+    const { error } = await supabase.storage.from(NOTES_BUCKET).remove([path])
+    if (error) {
+      console.error("Delete note error:", error)
+      addToast?.({ type: "error", title: "Error", message: "Failed to delete file." })
+      return
+    }
+    if (id) {
+      try {
+        await supabase.from("notes").delete().eq("id", id)
+      } catch (_) {
+        // ignore
+      }
+    }
+    addToast?.({ type: "success", title: "Deleted", message: "File removed." })
+    await loadCourseNotes()
+  }
+
+  const handleDownloadNote = async (path: string) => {
+    const { data: pub } = await supabase.storage.from(NOTES_BUCKET).getPublicUrl(path)
+    if (pub?.publicUrl) {
+      window.open(pub.publicUrl, "_blank")
+      return
+    }
+    const { data: signed, error } = await supabase.storage.from(NOTES_BUCKET).createSignedUrl(path, 60 * 60)
+    if (!error && signed?.signedUrl) {
+      window.open(signed.signedUrl, "_blank")
+    } else {
+      addToast?.({ type: "error", title: "Error", message: "Unable to generate download link." })
     }
   }
 
@@ -674,7 +838,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       const { data: attendanceData, error: attendanceError } = await supabase
         .from("students_attendance")
         .select("user_id, joined_at")
-        .eq("room_id", sessionId)
+        .eq("session_id", sessionId)
 
       if (attendanceError) throw attendanceError
 
@@ -716,9 +880,13 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     }
   }
 
-  const handleViewAttendanceDetails = (session: any) => {
-    setSelectedSessionForAttendance(session)
-    fetchSessionAttendees(session.id)
+  const handleViewAttendanceDetailsForRoomSession = (liveRoom: any, roomSession: any) => {
+    setSelectedSessionForAttendance({
+      room_name: liveRoom.room_name,
+      session_id: roomSession.session_id,
+      created_at: roomSession.created_at,
+    })
+    fetchSessionAttendees(roomSession.session_id)
   }
 
   const handleCloseAttendanceDetails = () => {
@@ -844,7 +1012,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
               tab="attendance"
               icon={<UserCheck className="w-5 h-5" />}
               label="Attendance"
-              count={attendanceData.length}
+              count={sessionAttendees.length}
               color="bg-gradient-to-r from-purple-500 to-pink-500"
             />
             <TabButton
@@ -853,6 +1021,13 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
               label="Recordings"
               count={recordings.length}
               color="bg-gradient-to-r from-amber-500 to-orange-500"
+            />
+            <TabButton
+              tab="notes"
+              icon={<FileText className="w-5 h-5" />}
+              label="Notes"
+              count={notes.length}
+              color="bg-gradient-to-r from-slate-500 to-slate-700"
             />
           </div>
         </div>
@@ -1068,16 +1243,16 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                                             <th className="text-left py-2 px-3 font-medium text-gray-700">Room</th>
                                             <th className="text-left py-2 px-3 font-medium text-gray-700">Session</th>
                                             <th className="text-left py-2 px-3 font-medium text-gray-700">Date</th>
-                                            <th className="text-left py-2 px-3 font-medium text-gray-700">Relative</th>
+
                                           </tr>
                                         </thead>
                                         <tbody>
                                           {(userAttendanceMap[student.id] || []).map((a, i) => (
                                             <tr key={i} className="border-b border-gray-200">
                                               <td className="py-2 px-3 text-gray-800">{a.room_name || '—'}</td>
-                                              <td className="py-2 px-3 text-gray-800">{a.room_name || a.session_id || '—'}</td>
+                                              <td className="py-2 px-3 text-gray-800">{a.session_id || '—'}</td>
                                               <td className="py-2 px-3 text-gray-800">{formatEnrollmentDate(a.joined_at)}</td>
-                                              <td className="py-2 px-3 text-gray-500">{formatRelativeFromNow(a.joined_at)}</td>
+
                                             </tr>
                                           ))}
                                         </tbody>
@@ -1306,14 +1481,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                         Attendance for: {selectedSessionForAttendance.room_name}
                       </h2>
                       <p className="text-gray-600 text-sm">
-                        {selectedSessionForAttendance.start_time
-                          ? new Date(selectedSessionForAttendance.start_time).toLocaleDateString("en-US", {
-                            weekday: "long",
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })
-                          : "N/A"}
+                        Session ID: {selectedSessionForAttendance.session_id}
                       </p>
                     </div>
                   </div>
@@ -1389,20 +1557,24 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   </div>
                 </div>
                 <div className="space-y-4">
-                  {sessions.map((session) => {
-                    const attendancePercentage =
-                      enrolledUsers.length > 0 ? ((attendanceCounts[session.id] || 0) / enrolledUsers.length) * 100 : 0
+                  {sessions.map((room) => {
+                    const total = attendanceCounts[room.id] || 0
+                    const attendancePercentage = enrolledUsers.length > 0 ? (total / enrolledUsers.length) * 100 : 0
+                    const roomSessions = roomSessionsMap[room.id] || []
+                    const isExpanded = expandedRoomId === room.id
                     return (
                       <div
-                        key={session.room_id}
+                        key={room.id}
                         className="border border-gray-200 rounded-xl p-4 hover:bg-gradient-to-r hover:from-gray-50 hover:to-purple-50 hover:border-purple-200 transition-all duration-200 shadow-sm hover:shadow-md"
                       >
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center justify-between mb-3" onClick={() => setExpandedRoomId(isExpanded ? null : room.id)}>
                           <div>
-                            <h3 className="text-base font-bold text-gray-900">{session.room_name}</h3>
+                            <h3 className="text-base font-bold text-gray-900 cursor-pointer" >
+                              {room.room_name}
+                            </h3>
                             <p className="text-gray-600 font-medium text-sm">
-                              {session.start_time
-                                ? new Date(session.start_time).toLocaleDateString("en-US", {
+                              {room.start_time
+                                ? new Date(room.start_time).toLocaleDateString("en-US", {
                                   weekday: "long",
                                   year: "numeric",
                                   month: "long",
@@ -1413,46 +1585,51 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                           </div>
                           <div className="text-right">
                             <div className="text-xl font-bold text-gray-900">
-                              {attendanceCounts[session.id] ?? "..."} / {enrolledUsers.length}
+                              {total} / {enrolledUsers.length}
                             </div>
                             <div className="text-sm font-semibold text-purple-600">
                               {enrolledUsers.length > 0 ? `${Math.round(attendancePercentage)}% attendance` : "N/A"}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-6 mb-4 text-sm text-gray-600">
-                          <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
-                            <Clock className="w-4 h-4" />
-                            <span className="font-medium">Duration: N/A</span>
+                        {isExpanded && (
+                          <div className="mt-3 space-y-2">
+                            {roomSessions.length === 0 ? (
+                              <div className="text-sm text-gray-500">No sessions created for this room yet.</div>
+                            ) : (
+                              roomSessions.map((rs) => {
+                                const count = sessionAttendanceCounts[rs.session_id] || 0
+                                const percent = enrolledUsers.length > 0 ? Math.round((count / enrolledUsers.length) * 100) : 0
+                                return (
+                                  <div key={rs.session_id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-sm text-gray-700">
+                                        <div className="font-semibold">Session: {rs.session_id}</div>
+                                        <div className="text-xs text-gray-500">{new Date(rs.created_at).toLocaleString()} {rs.active ? '(active)' : ''}</div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="text-base font-bold text-gray-900">{count} / {enrolledUsers.length}</div>
+                                        <div className="text-xs font-semibold text-purple-600">{percent}%</div>
+                                      </div>
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between">
+                                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden mr-4">
+                                        <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-full" style={{ width: `${percent}%` }} />
+                                      </div>
+                                      <button
+                                        onClick={() => handleViewAttendanceDetailsForRoomSession(room, rs)}
+                                        className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-2 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors text-sm"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                        View Details
+                                      </button>
+                                    </div>
+                                  </div>
+                                )
+                              })
+                            )}
                           </div>
-                          <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
-                            <Users className="w-4 h-4" />
-                            <span className="font-medium">{session.max_participants} participants</span>
-                          </div>
-                          <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
-                            <Award className="w-4 h-4" />
-                            <span className="font-medium">Rating: N/A</span>
-                          </div>
-                        </div>
-                        {/* Attendance Bar */}
-                        <div className="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden shadow-inner">
-                          <div
-                            className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-1000 shadow-sm"
-                            style={{ width: `${attendancePercentage}%` }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <button
-                            onClick={() => handleViewAttendanceDetails(session)}
-                            className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-2 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-lg transition-colors"
-                          >
-                            <Eye className="w-4 h-4" />
-                            View Details
-                          </button>
-                          <button className="text-gray-600 hover:text-gray-700 font-semibold bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors">
-                            Export Report
-                          </button>
-                        </div>
+                        )}
                       </div>
                     )
                   })}
@@ -1551,6 +1728,108 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        {activeTab === "notes" && (
+          <div className="space-y-6">
+            {/* Main container for the notes section */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-700 rounded-lg shadow-sm">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">Course Notes</h2>
+                    <p className="text-gray-600 text-sm">Manage and upload notes for learners</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section to display existing notes */}
+              <div className="p-6">
+                {loadingNotes ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                  </div>
+                ) : notes.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500 italic">
+                    No notes have been uploaded yet.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {notes.map((f) => (
+                      <div key={f.name} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg shadow-sm hover:bg-gray-100 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-md bg-blue-100 flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900 truncate max-w-[150px]">{f.name}</div>
+                            <div className="text-xs text-gray-500">{Math.round(((f.size || 0) / 1024) * 10) / 10} KB</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={f.url} // Assuming f.url exists
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-200 rounded-md transition-colors"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                          <button
+                            onClick={() => void handleDeleteNote(f.path, f.id)}
+                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-md transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Section to add a new note (replaces the modal) */}
+              <div className="p-6 border-t border-gray-200 bg-gray-50">
+                <h3 className="text-md font-semibold text-gray-800 mb-4">Add New Note</h3>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <input
+                    type="text"
+                    placeholder="Note Name"
+                    value={noteName}
+                    onChange={(e) => setNoteName(e.target.value)}
+                    className="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  />
+                  <label htmlFor="file-upload" className="flex items-center justify-center bg-blue-500 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors cursor-pointer">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </label>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    className="hidden"
+                    accept="application/pdf,application/*,image/*"
+                    onChange={(e) => setNoteFile(e.target.files?.[0] || null)}
+                  />
+                  <button
+                    onClick={handleCreateNote}
+                    disabled={uploadingNotes || !noteName || !noteFile}
+                    className={`py-2 px-4 rounded-lg font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${uploadingNotes ? 'bg-green-500' : 'bg-slate-600 hover:bg-slate-700'
+                      }`}
+                  >
+                    {uploadingNotes ? "Saving..." : "Save Note"}
+                  </button>
+                </div>
+                {noteFile && (
+                  <p className="mt-2 text-sm text-gray-600">Selected file: <span className="font-medium text-blue-600">{noteFile.name}</span></p>
+                )}
+                {noteError && (
+                  <p className="mt-2 text-sm text-red-600">{noteError}</p>
+                )}
+              </div>
             </div>
           </div>
         )}
