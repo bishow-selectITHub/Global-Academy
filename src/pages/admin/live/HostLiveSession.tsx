@@ -530,6 +530,18 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   const handleJoinSession = async (session: any) => {
     setJoiningSession(session.id)
     try {
+      // Reset persistence flags and cleanup from any previous session before starting a new one
+      if (persistFallbackTimerRef.current) {
+        clearTimeout(persistFallbackTimerRef.current)
+        persistFallbackTimerRef.current = null
+      }
+      hasPersistedRef.current = false
+      isPersistingRef.current = false
+      setCurrentSessionData(null)
+      hostLiveRoomIdRef.current = null
+      hostHmsRoomIdRef.current = null
+      setPendingRoomId(null)
+
       console.log("🚀 [DEBUG] handleJoinSession called with session:", {
         sessionId: session.id,
         sessionRoomId: session.room_id,
@@ -1697,6 +1709,12 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                 setVideoToken(null)
                 setVideoUserName("")
                 setCurrentSessionData(null)
+                // Reset flags so a new session can be persisted on next start
+                hasPersistedRef.current = false
+                isPersistingRef.current = false
+                hostLiveRoomIdRef.current = null
+                hostHmsRoomIdRef.current = null
+                setPendingRoomId(null)
                 addToast?.({
                   type: "success",
                   title: "Session Ended",
