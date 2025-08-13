@@ -1,85 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import {
-    Clock,
-    BarChart,
-    CheckCircle,
-    Lock,
-    Play,
-    FileText,
-    Users,
-    Award,
-    BookOpen,
-    HelpCircle,
-} from 'lucide-react';
+import { Clock, BarChart, CheckCircle, Play, FileText, Users, Award, BookOpen, Info, UserCheck, Video, Star, Calendar, Download, Target, TrendingUp } from 'lucide-react';
 import { Card, CardContent } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import { useToast } from '../../../components/ui/Toaster';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchNotesByCourse } from '../../../store/notesSlice';
+import type { AppDispatch } from '../../../store';
 import { RootState } from '../../../store';
 
+
 import { supabase } from '../../../lib/supabase';
-import { HMSRoomProvider, useHMSStore, selectIsConnectedToRoom, selectRoom } from "@100mslive/react-sdk";
-import { HMSPrebuilt } from "@100mslive/roomkit-react";
+import { HMSRoomProvider } from "@100mslive/react-sdk";
 
 const GENERATE_TOKEN_ENDPOINT = "https://smqnaddacvwwuehxymbr.supabase.co/functions/v1/generate-hms-token";
 
-// Add type for LiveSessionModal props
-interface LiveSessionModalProps {
-    open: boolean;
-    onClose: () => void;
-    token: string | null;
-    userId: string;
-    roomId: string;
-}
-
-const SessionLogger = () => {
-    const isConnected = useHMSStore(selectIsConnectedToRoom);
-    const room = useHMSStore(selectRoom);
-    const loggedRef = React.useRef(false);
-
-    React.useEffect(() => {
-        if (!loggedRef.current && isConnected && room?.sessionId) {
-            loggedRef.current = true;
-            // Log the joined session's instance id
-            console.log("100ms session_id (learner join):", room.sessionId);
-        }
-    }, [isConnected, room?.sessionId]);
-
-    return null;
-};
-
-const LiveSessionModal = ({ open, onClose, token, userId, roomId }: LiveSessionModalProps) => {
-    if (!open) return null;
-    // Cast Prebuilt to any to accommodate prop differences across versions
-    const Prebuilt: any = HMSPrebuilt as unknown as any;
-    return (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center">
-            <div className="w-full h-full relative">
-
-                {token ? (
-                    <>
-                        <SessionLogger />
-                        <Prebuilt authToken={token} userName={userId} />
-                    </>
-                ) : (
-                    <div className="flex items-center justify-center h-full text-white text-lg">Joining live session...</div>
-                )}
-            </div>
-        </div>
-    );
-};
+// <CHANGE> Keep all existing interfaces and components unchanged
+// Live session modal replaced by opening /live/join in new tab
 
 const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
     const [sessions, setSessions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [joinModal, setJoinModal] = useState<{ open: boolean, token: string | null, userId: string, roomId: string } | null>(null);
-
+    // modal state removed
 
     useEffect(() => {
         const fetchSessions = async () => {
             setLoading(true);
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from('live_rooms')
                 .select('*')
                 .eq('course_id', courseId)
@@ -89,8 +36,6 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
         };
         fetchSessions();
     }, [courseId]);
-
-
 
     const handleJoinSession = async (session: any) => {
         const sessionResponse = await supabase.auth.getSession();
@@ -103,7 +48,6 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
         }
 
         try {
-            // Try to get active session_id from room_sessions for this room
             let activeSessionId: string | null = null;
             try {
                 const { data: activeRow } = await supabase
@@ -134,10 +78,8 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
             console.log("🚀 [APP][HMS] learner token response:", { sessionId: data.session_id || data.sessionInstanceId, roomId: session.room_id })
             if (!res.ok) throw new Error(data.error || 'Failed to generate 100ms token');
 
-            // Determine the real session id to record attendance under
             const realSessionId = activeSessionId || data.session_id || data.sessionInstanceId;
             console.log(realSessionId)
-            // Insert attendance record once per (user_id, session_id)
             if (realSessionId) {
                 const { data: existing, error: fetchExistingError } = await supabase
                     .from('students_attendance')
@@ -162,50 +104,61 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
                 }
             }
 
-            setJoinModal({ open: true, token: data.token, userId: user.id, roomId: session.room_id });
+            const joinUrl = `/live/join?token=${encodeURIComponent(data.token)}&userName=${encodeURIComponent(user.id)}`;
+            window.open(joinUrl, '_blank', 'noopener,noreferrer');
         } catch (err: any) {
             alert(err.message);
         }
     };
 
-    if (loading) return <div>Loading live sessions...</div>;
+    if (loading) return (
+        <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            <span className="ml-3 text-slate-600">Loading live sessions...</span>
+        </div>
+    );
 
     return (
         <HMSRoomProvider>
-            <div>
-                <h3 className="text-lg font-semibold mb-4">Live Sessions</h3>
+            <div className="space-y-6">
                 {sessions.length === 0 ? (
-                    <div className="text-slate-500">No live sessions scheduled for this course.</div>
+                    <div className="text-center py-12 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
+                        <Video size={48} className="mx-auto text-purple-400 mb-4" />
+                        <h3 className="text-lg font-semibold text-slate-800 mb-2">No Live Sessions</h3>
+                        <p className="text-slate-600">No live sessions are currently scheduled for this course.</p>
+                    </div>
                 ) : (
-                    <div className="space-y-4">
+                    <div className="grid gap-4">
                         {sessions.map(session => (
                             <div
                                 key={session.id}
-                                className="flex items-center justify-between bg-white rounded-lg shadow p-4 border border-slate-200"
+                                className="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                             >
-                                <div>
-                                    <div className="font-semibold text-slate-800">{session.room_name}</div>
-                                    <div className="text-sm text-slate-500">{new Date(session.start_time).toLocaleString()}</div>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-4">
+                                        <div className="bg-white bg-opacity-20 rounded-full p-3">
+                                            <Video size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold">{session.room_name}</h3>
+                                            <div className="flex items-center space-x-2 mt-1">
+                                                <Calendar size={16} />
+                                                <span className="text-purple-100">{new Date(session.start_time).toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        onClick={() => handleJoinSession(session)}
+                                        className="bg-purple-600 text-white  font-semibold px-6 py-2 rounded-lg transition-colors"
+                                    >
+                                        Join Session
+                                    </Button>
                                 </div>
-                                <button
-                                    onClick={() => handleJoinSession(session)}
-                                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-                                >
-                                    Join Live Session
-                                </button>
                             </div>
                         ))}
                     </div>
                 )}
-                {joinModal && joinModal.open && (
-                    <LiveSessionModal
-                        open={joinModal.open}
-                        onClose={() => setJoinModal(null)}
-                        token={joinModal.token}
-                        userId={joinModal.userId}
-                        roomId={joinModal.roomId}
-                    />
-                )}
+                {/* Live join now opens in a new tab */}
             </div>
         </HMSRoomProvider>
     );
@@ -213,25 +166,25 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
 
 const CourseView = () => {
     const { id } = useParams<{ id: string }>();
+    const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
     const { addToast } = useToast();
-    const [activeTab, setActiveTab] = useState('overview');
+    // <CHANGE> Changed from tabs to sections navigation
+    const [activeSection, setActiveSection] = useState('info');
     const [courseQuiz, setCourseQuiz] = useState<any>(null);
 
-    // Defensive checks for slices
     const courseSlice = useSelector((state: RootState) => state.courses || { data: [] });
     const enrollmentSlice = useSelector((state: RootState) => state.enrollments || { data: [] });
     const quizSlice = useSelector((state: RootState) => state.quizzes || { data: [] });
 
     const course = courseSlice.data.find((c: any) => c.id === id) as any;
-    console.log(course);
     const enrollment = enrollmentSlice.data.find((e: any) => e.course?.id === id) as any;
-    console.log(enrollment)
     const quiz = quizSlice.data.find((q: any) => q.course_id === id) as any;
 
     const quizScore: any = enrollment?.quizScore;
     const isEnrolled = !!enrollment;
     const progress = enrollment?.progress || 0;
+    const numericProgress = Number(progress) || 0;
     const userLessons = course?.lessons || [];
 
     useEffect(() => {
@@ -246,6 +199,21 @@ const CourseView = () => {
         };
         fetchQuiz();
     }, [course?.id]);
+
+    // Prefetch notes for this course once
+    const notesBucket = useSelector((state: RootState) => state.notes.byCourseId[id || '']);
+    useEffect(() => {
+        if (isEnrolled && id && !notesBucket?.loaded && !notesBucket?.loading) {
+            dispatch(fetchNotesByCourse(id));
+        }
+    }, [dispatch, isEnrolled, id, notesBucket?.loaded, notesBucket?.loading]);
+
+    const getNoteDisplayName = (note: { name?: string; file_url: string }) => {
+        const raw = (note.name || note.file_url).split('/').pop() || '';
+        const decoded = decodeURIComponent(raw);
+        // Strip leading timestamp prefixes like 1755077363614_*
+        return decoded.replace(/^\d+_/, '');
+    };
 
     const handleEnroll = (courseId: string) => {
         console.log('[Enroll Debug] handleEnroll called with courseId:', courseId);
@@ -279,453 +247,476 @@ const CourseView = () => {
         );
     }
 
-    return (
-        <div>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">{course.title}</h1>
-                    <div className="flex items-center text-sm text-slate-600 mt-1">
-                        <span className="flex items-center">
-                            <Clock size={16} className="mr-1" />
-                            {course.duration}
-                        </span>
-                        <span className="mx-2">•</span>
-                        <span className="flex items-center">
-                            <BarChart size={16} className="mr-1" />
-                            {course.level}
-                        </span>
-                        <span className="mx-2">•</span>
-                        <span className="flex items-center">
-                            <Users size={16} className="mr-1" />
-                            {(course as any).enrolled || 0} enrolled
-                        </span>
-                    </div>
-                </div>
-                <div className="flex items-center">
-                    {
-                        progress !== "100" && <> {isEnrolled ? (
-                            <Link to={`/courses/${course.id}/lessons/${userLessons[0]?.id || ''}`}>
-                                <Button leftIcon={<Play size={20} />}>Continue Learning</Button>
-                            </Link>
-                        ) : (
-                            <Button onClick={() => handleEnroll(course.id)} leftIcon={<BookOpen size={20} />}>
-                                Enroll Course
-                            </Button>
-                        )}</>
-                    }
+    // <CHANGE> New section navigation items
+    const navigationItems = [
+        { id: 'info', label: 'Course Info', icon: Info },
+        { id: 'enroll', label: 'Enrollment', icon: UserCheck },
+        { id: 'sessions', label: 'Live Sessions', icon: Video }
+    ];
 
-                </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="md:col-span-2">
-                    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden mb-6">
-                        <div className="aspect-video bg-slate-200 relative">
-                            <img
-                                src={course.thumbnail}
-                                alt={course.title}
-                                className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40">
-                                <button className="bg-white bg-opacity-90 rounded-full p-4 shadow-lg hover:bg-opacity-100 transition">
-                                    <Play size={24} className="text-blue-700" />
-                                </button>
+    return (
+        <div className="min-h-screen bg-slate-50">
+            {/*  Enhanced hero section with subtle professional styling */}
+            <div className="bg-white border-b border-slate-200 shadow-sm">
+                <div className="max-w-7xl mx-auto px-6 py-10">
+                    <div className="flex flex-col lg:flex-row items-start justify-between gap-8">
+                        <div className="flex-1">
+                            <h1 className="text-2xl font-semibold text-slate-900 mb-3">{course.title}</h1>
+                            <div className="flex flex-wrap items-center gap-6 text-slate-600 mb-6">
+                                <div className="flex items-center bg-slate-100 px-3 py-2 rounded-lg">
+                                    <Clock size={18} className="mr-2 text-blue-600" />
+                                    <span className="font-medium">{course.duration}</span>
+                                </div>
+                                <div className="flex items-center bg-slate-100 px-3 py-2 rounded-lg">
+                                    <BarChart size={18} className="mr-2 text-green-600" />
+                                    <span className="font-medium">{course.level}</span>
+                                </div>
+                                <div className="flex items-center bg-slate-100 px-3 py-2 rounded-lg">
+                                    <Users size={18} className="mr-2 text-purple-600" />
+                                    <span className="font-medium">{(course as any).enrolled || 0} enrolled</span>
+                                </div>
+                            </div>
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="font-semibold text-slate-900 flex items-center">
+                                        <TrendingUp size={18} className="mr-2 text-blue-600" />
+                                        Course Progress
+                                    </span>
+                                    <span className="text-sm font-medium text-blue-700 bg-blue-100 px-3 py-1 rounded-full">
+                                        {Math.round(numericProgress)}% complete
+                                    </span>
+                                </div>
+                                <div className="w-full bg-blue-200 rounded-full h-3">
+                                    <div
+                                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-700 shadow-sm"
+                                        style={{ width: `${numericProgress}%` }}
+                                    ></div>
+                                </div>
                             </div>
                         </div>
-                        <div className="p-6">
-                            {/* Tabs */}
-                            <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
-                                <div className="flex space-x-8">
-                                    <button
-                                        className={`pb-4 text-sm font-medium border-b-2 ${activeTab === 'overview'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
-                                            }`}
-                                        onClick={() => setActiveTab('overview')}
-                                    >
-                                        Overview
-                                    </button>
-                                    <button
-                                        className={`pb-4 text-sm font-medium border-b-2 ${activeTab === 'curriculum'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
-                                            }`}
-                                        onClick={() => setActiveTab('curriculum')}
-                                    >
-                                        Curriculum
-                                    </button>
-                                    <button
-                                        className={`pb-4 text-sm font-medium border-b-2 ${activeTab === 'resources'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
-                                            }`}
-                                        onClick={() => setActiveTab('resources')}
-                                    >
-                                        Resources
-                                    </button>
-                                </div>
+                        <div className="lg:w-80">
+                            <div className="relative">
+                                <img
+                                    src={course.thumbnail || "/placeholder.svg"}
+                                    alt={course.title}
+                                    className="w-full h-48 object-cover rounded-xl border border-slate-200 shadow-lg"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-xl"></div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                            {/* Tab content */}
-                            {activeTab === 'overview' && (
-                                <div className="space-y-6">
-                                    <div>
-                                        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">About This Course</h2>
-                                        <p className="text-slate-700 dark:text-slate-300">{course.description}</p>
+            {/*  Enhanced section navigation with better styling */}
+            <div className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+                <div className="max-w-7xl mx-auto px-6">
+                    <nav className="flex space-x-8">
+                        {navigationItems.map((item) => {
+                            const Icon = item.icon;
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setActiveSection(item.id)}
+                                    className={`flex items-center space-x-2 py-4 px-3 border-b-3 font-semibold text-sm transition-all duration-200 ${activeSection === item.id
+                                        ? 'border-blue-600 text-blue-600 bg-blue-50'
+                                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    <Icon size={18} />
+                                    <span>{item.label}</span>
+                                </button>
+                            );
+                        })}
+                    </nav>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-6 py-10">
+                {/* Course Info Section */}
+                {activeSection === 'info' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2 space-y-8">
+                            {/*  Enhanced Course Description with better styling */}
+                            <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                                <CardContent className="p-8">
+                                    <div className="flex items-center mb-6">
+                                        <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                                            <BookOpen size={18} className="text-blue-600" />
+                                        </div>
+                                        <h2 className="text-lg font-semibold text-slate-900">About This Course</h2>
                                     </div>
+                                    <p className="text-slate-700 leading-relaxed text-sm">{course.description}</p>
+                                </CardContent>
+                            </Card>
 
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">What You'll Learn</h3>
-                                        <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300">
-                                            {(course.objectives || []).map((objective: string, index: number) => (
-                                                <li key={index} className="flex items-start">
-                                                    <CheckCircle size={16} className="text-green-500 mr-2 mt-1 flex-shrink-0" />
-                                                    <span>{objective}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
+                            {/*  Enhanced Learning Objectives */}
+                            <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                                <CardContent className="p-8">
+                                    <div className="flex items-center mb-6">
+                                        <div className="bg-green-100 p-2 rounded-lg mr-3">
+                                            <Target size={18} className="text-green-600" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold text-slate-900">What You'll Learn</h3>
                                     </div>
-
-                                    <div>
-                                        <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Instructor</h3>
-                                        <div className="flex items-center">
-                                            <img
-                                                src={course.instructor_avatar || '/path-to-default-avatar.png'}
-                                                alt={course.instructor}
-                                                className="h-16 w-16 rounded-full mr-4"
-                                            />
-                                            <div>
-                                                <h4 className="font-bold text-slate-800 dark:text-slate-200">{course.instructor}</h4>
-                                                <p className="text-sm text-slate-500 dark:text-slate-400">{course.instructor_title}</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {(course.objectives || []).map((objective: string, index: number) => (
+                                            <div key={index} className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                                                <CheckCircle size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
+                                                <span className="text-slate-700 text-sm">{objective}</span>
                                             </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/*  Enhanced Course Curriculum */}
+                            <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                                <CardContent className="p-8">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="flex items-center">
+                                            <div className="bg-purple-100 p-2 rounded-lg mr-3">
+                                                <FileText size={18} className="text-purple-600" />
+                                            </div>
+                                            <h3 className="text-lg font-semibold text-slate-900">Course Curriculum</h3>
+                                        </div>
+                                        <div className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
+                                            {userLessons.length} lessons • {course.duration}
                                         </div>
                                     </div>
-
-                                    {quiz && (
-                                        <div>
-                                            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Final Quiz</h3>
-                                            <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                                <div className="flex-grow">
-                                                    <div className="flex items-center mb-2">
-                                                        <Award size={20} className="text-amber-500 mr-2" />
-                                                        <h4 className="font-semibold text-lg text-slate-800 dark:text-slate-100">{quiz.title}</h4>
-                                                    </div>
-                                                    <p className="text-slate-600 dark:text-slate-400">
-                                                        Complete the course to unlock the final quiz and earn your certificate.
-                                                    </p>
-                                                </div>
-                                                <div className="flex-shrink-0">
-                                                    {isEnrolled ? (
-                                                        quizScore ? (
-                                                            <Link to={`/courses/${id}/quiz`}>
-                                                                <Button variant="outline">View Quiz</Button>
-                                                            </Link>
-                                                        ) : progress === "100" ? (
-                                                            <Link to={`/courses/${id}/quiz`}>
-                                                                <Button variant="primary">Start Quiz</Button>
-                                                            </Link>
-                                                        ) : (
-                                                            <Button variant="primary" disabled title="Complete all lessons to unlock the quiz">
-                                                                Start Quiz
-                                                            </Button>
-                                                        )
+                                    <div className="space-y-4">
+                                        {userLessons.map((lesson: any, index: number) => (
+                                            <div
+                                                key={lesson.id}
+                                                className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-all duration-200"
+                                            >
+                                                <div className="flex items-center space-x-4">
+                                                    {lesson.completed ? (
+                                                        <div className="bg-green-100 p-1.5 rounded-full">
+                                                            <CheckCircle size={16} className="text-green-600" />
+                                                        </div>
                                                     ) : (
-                                                        <Button variant="primary" disabled title="Enroll in the course to take the quiz">
-                                                            Start Quiz
-                                                        </Button>
+                                                        <div className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-200 text-slate-600 text-sm font-semibold">
+                                                            {index + 1}
+                                                        </div>
                                                     )}
+                                                    <div>
+                                                        <h4 className="font-medium text-slate-900 text-base">{lesson.title}</h4>
+                                                        <div className="flex items-center text-xs text-slate-500 mt-1">
+                                                            {lesson.type === 'video' && <Play size={14} className="mr-2 text-blue-500" />}
+                                                            {lesson.type === 'text' && <FileText size={14} className="mr-2 text-green-500" />}
+                                                            {lesson.type === 'quiz' && <Award size={14} className="mr-2 text-yellow-500" />}
+                                                            <span>{lesson.duration}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {isEnrolled && (
+                                                    <Link to={`/courses/${course.id}/lessons/${lesson.id}`}>
+                                                        <Button size="sm" variant={lesson.completed ? "outline" : "primary"}>
+                                                            {lesson.completed ? 'Review' : 'Start'}
+                                                        </Button>
+                                                    </Link>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/*  Enhanced Quiz Section */}
+                            {quiz && (
+                                <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <CardContent className="p-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="bg-amber-100 p-2 rounded-lg mr-3">
+                                                    <Award size={18} className="text-amber-600" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-semibold text-slate-900">Final Quiz</h3>
+                                                    <p className="text-slate-600 mt-1 text-sm">Test your knowledge and earn your certificate</p>
                                                 </div>
                                             </div>
-                                            {isEnrolled && progress !== 100 && !quizScore && (
-                                                <p className="text-sm text-slate-500 mt-3">
-                                                    Your current progress is {progress}%. Complete all lessons to take the quiz.
-                                                </p>
+                                            {isEnrolled ? (
+                                                quizScore ? (
+                                                    <Link to={`/courses/${id}/quiz`}>
+                                                        <Button variant="outline">
+                                                            View Results
+                                                        </Button>
+                                                    </Link>
+                                                ) : progress === "100" ? (
+                                                    <Link to={`/courses/${id}/quiz`}>
+                                                        <Button>
+                                                            Start Quiz
+                                                        </Button>
+                                                    </Link>
+                                                ) : (
+                                                    <Button disabled>
+                                                        Complete Course First
+                                                    </Button>
+                                                )
+                                            ) : (
+                                                <Button disabled>
+                                                    Enroll to Access
+                                                </Button>
                                             )}
                                         </div>
-                                    )}
-                                </div>
+                                    </CardContent>
+                                </Card>
                             )}
+                        </div>
 
-                            {activeTab === 'curriculum' && (
-                                <div className="space-y-2">
-                                    <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Course Content</h2>
-
-                                    <div className="mb-4 flex justify-between items-center">
-                                        <div className="text-sm text-slate-600 dark:text-slate-400">
-                                            <span className="font-medium">{userLessons.length} lessons</span>
-                                            <span className="mx-2">•</span>
-                                            <span>{course.duration} total</span>
+                        {/*  Enhanced Instructor Info Sidebar */}
+                        <div className="space-y-6">
+                            <Card className="bg-white border border-slate-200 shadow-sm">
+                                <CardContent className="p-6">
+                                    <h3 className="text-base font-semibold text-slate-900 mb-4 flex items-center">
+                                        <div className="bg-indigo-100 p-2 rounded-lg mr-2">
+                                            <Users size={16} className="text-indigo-600" />
                                         </div>
-
-                                        <button className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-                                            Expand All
-                                        </button>
+                                        Instructor
+                                    </h3>
+                                    <div className="text-center">
+                                        <div className="relative inline-block mb-4">
+                                            <img
+                                                src={course.instructor_avatar || '/placeholder.svg?height=80&width=80&query=instructor'}
+                                                alt={course.instructor}
+                                                className="w-16 h-16 rounded-full mx-auto border-4 border-indigo-100 shadow"
+                                            />
+                                            <div className="absolute -bottom-1 -right-1 bg-green-500 w-6 h-6 rounded-full border-2 border-white"></div>
+                                        </div>
+                                        <h4 className="font-semibold text-slate-900 text-base">{course.instructor}</h4>
+                                        <p className="text-indigo-600 text-xs mb-3">{course.instructor_title}</p>
                                     </div>
+                                </CardContent>
+                            </Card>
 
-                                    <div className="border border-slate-200 rounded-lg divide-y divide-slate-200 dark:border-slate-700 dark:divide-slate-700">
-                                        {userLessons.map((lesson: any, index: number) => (
-                                            <Link
-                                                key={lesson.id}
-                                                to={`/courses/${course.id}/lessons/${lesson.id}`}
-                                                className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center">
-                                                        {lesson.completed ? (
-                                                            <CheckCircle size={18} className="text-green-500 mr-3" />
-                                                        ) : (
-                                                            <div className="w-5 h-5 flex items-center justify-center rounded-full border border-slate-300 dark:border-slate-600 mr-3">
-                                                                <span className="text-xs text-slate-600 dark:text-slate-400">{index + 1}</span>
-                                                            </div>
-                                                        )}
+                            {/*  Enhanced Course Resources */}
+                            <Card className="bg-white border border-slate-200 shadow-sm">
+                                <CardContent className="p-6">
+                                    <h3 className="font-semibold text-slate-900 mb-4 flex items-center text-base">
+                                        <div className="bg-emerald-100 p-2 rounded-lg mr-2">
+                                            <Download size={16} className="text-emerald-600" />
+                                        </div>
+                                        Course Resources
+                                    </h3>
+                                    {!isEnrolled ? (
+                                        <div className="text-slate-600 text-sm">Enroll to access resources and notes.</div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {notesBucket?.loading && (
+                                                <div className="text-slate-500 text-sm">Loading resources...</div>
+                                            )}
+                                            {!notesBucket?.loading && (notesBucket?.data || []).length === 0 && (
+                                                <div className="text-slate-500 text-sm">No resources available.</div>
+                                            )}
+                                            {(notesBucket?.data || []).map((note) => (
+                                                <a
+                                                    key={note.id}
+                                                    href={note.file_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center p-3 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors"
+                                                >
+                                                    <div className="bg-green-100 p-2 rounded-lg mr-2">
+                                                        <FileText className="h-4 w-4 text-green-600" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <p className="font-medium text-slate-900 text-sm">{getNoteDisplayName(note)}</p>
+                                                        <p className="text-xs text-slate-500 break-all">{note.file_url}</p>
+                                                    </div>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+                )}
 
-                                                        <div>
-                                                            <h4 className="font-medium text-slate-800 dark:text-slate-200">{lesson.title}</h4>
-                                                            <div className="flex items-center text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                                {lesson.type === 'video' && <Play size={12} className="mr-1" />}
-                                                                {lesson.type === 'text' && <FileText size={12} className="mr-1" />}
-                                                                {lesson.type === 'quiz' && <Award size={12} className="mr-1" />}
-                                                                <span>{lesson.duration}</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                {/*  Significantly enhanced Enrollment Section */}
+                {activeSection === 'enroll' && (
+                    <div className="max-w-5xl mx-auto">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                                <CardContent className="p-10">
+                                    <div className="text-center">
+                                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full p-4 w-16 h-16 mx-auto mb-6 shadow-lg">
+                                            <BookOpen size={32} className="text-white" />
+                                        </div>
+                                        <h2 className="text-3xl font-bold text-slate-900 mb-4">
+                                            {isEnrolled ? 'Continue Learning' : 'Enroll in Course'}
+                                        </h2>
+                                        <p className="text-slate-600 mb-8 text-lg leading-relaxed">
+                                            {isEnrolled
+                                                ? 'Pick up where you left off and continue your learning journey with expert guidance.'
+                                                : 'Join thousands of learners and start your professional development journey today.'
+                                            }
+                                        </p>
 
-                                                    <Button size="sm" variant={lesson.completed ? "outline" : "primary"}>
-                                                        {lesson.completed ? 'Review' : 'Start'}
-                                                    </Button>
-                                                </div>
-                                                {!lesson.completed && index > 0 && !userLessons[index - 1].completed && (
-                                                    <Lock size={14} className="ml-auto text-slate-400 flex-shrink-0" />
-                                                )}
-                                            </Link>
-                                        ))}
-                                        {quiz && (
-                                            <div
-                                                className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm"
-                                            >
-                                                <div className="flex items-center">
-                                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 mr-4">
-                                                        <HelpCircle size={20} />
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-semibold text-slate-800 dark:text-slate-100">{quiz.title}</h4>
-                                                        <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                                            <Clock size={14} className="mr-1" />
-                                                            <span>{quiz.timeLimit} minutes</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                        {progress !== "100" && (
+                                            <div className="mb-8">
                                                 {isEnrolled ? (
-                                                    quizScore ? (
-                                                        <Link to={`/courses/${id}/quiz`}>
-                                                            <Button variant="outline">View Quiz</Button>
-                                                        </Link>
-                                                    ) : progress === "100" ? (
-                                                        <Link to={`/courses/${id}/quiz`}>
-                                                            <Button variant="primary">Start Quiz</Button>
-                                                        </Link>
-                                                    ) : (
-                                                        <Button variant="primary" disabled title="Complete all lessons to unlock the quiz">
-                                                            Start Quiz
+                                                    <Link to={`/courses/${course.id}/lessons/${userLessons[0]?.id || ''}`}>
+                                                        <Button
+                                                            size="lg"
+                                                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-10 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                                                            leftIcon={<Play size={24} />}
+                                                        >
+                                                            Continue Learning
                                                         </Button>
-                                                    )
+                                                    </Link>
                                                 ) : (
-                                                    <Button variant="primary" disabled title="Enroll in the course to take the quiz">
-                                                        Start Quiz
+                                                    <Button
+                                                        onClick={() => handleEnroll(course.id)}
+                                                        size="lg"
+                                                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-10 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                                                        leftIcon={<BookOpen size={24} />}
+                                                    >
+                                                        Enroll Now
                                                     </Button>
                                                 )}
                                             </div>
                                         )}
-                                    </div>
-                                </div>
-                            )}
 
-                            {activeTab === 'resources' && (
-                                <div>
-                                    <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Course Resources</h2>
-
-                                    <div className="space-y-3">
-                                        <a
-                                            href="#"
-                                            className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition dark:border-slate-700 dark:hover:bg-slate-700"
-                                        >
-                                            <FileText className="h-5 w-5 text-blue-600 mr-3 dark:text-blue-400" />
-                                            <div>
-                                                <p className="font-medium text-slate-800 dark:text-slate-200">Employee Handbook.pdf</p>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">2.4 MB • PDF Document</p>
-                                            </div>
-                                        </a>
-
-                                        <a
-                                            href="#"
-                                            className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition dark:border-slate-700 dark:hover:bg-slate-700"
-                                        >
-                                            <FileText className="h-5 w-5 text-blue-600 mr-3 dark:text-blue-400" />
-                                            <div>
-                                                <p className="font-medium text-slate-800 dark:text-slate-200">Company Structure Chart.pdf</p>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">1.8 MB • PDF Document</p>
-                                            </div>
-                                        </a>
-
-                                        <a
-                                            href="#"
-                                            className="flex items-center p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition dark:border-slate-700 dark:hover:bg-slate-700"
-                                        >
-                                            <FileText className="h-5 w-5 text-blue-600 mr-3 dark:text-blue-400" />
-                                            <div>
-                                                <p className="font-medium text-slate-800 dark:text-slate-200">IT Security Guidelines.pdf</p>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">3.2 MB • PDF Document</p>
-                                            </div>
-                                        </a>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    {isEnrolled && (
-                        <LearnerLiveSessions courseId={course.id} />
-                    )}
-                </div>
-
-                <div className="md:col-span-1">
-                    <Card className="sticky top-6">
-                        <CardContent className="p-6">
-                            <Button
-                                onClick={() => isEnrolled ? navigate(`/courses/${course.id}/lessons/${userLessons?.[0]?.id || ''}`) : handleEnroll(course.id)}
-                                leftIcon={isEnrolled ? <Play size={18} /> : <BookOpen size={18} />}
-                                fullWidth
-                                disabled={isEnrolled && progress === "100"}
-                                className={isEnrolled && progress === "100" ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500' : ''}
-                            >
-                                {isEnrolled
-                                    ? progress === "100"
-                                        ? 'Completed'
-                                        : progress > 0
-                                            ? 'Continue Course'
-                                            : 'Start Course'
-                                    : 'Enroll Now'}
-                            </Button>
-
-                            <div className="space-y-4 mt-6">
-                                <div className="flex items-center">
-                                    <Clock size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Duration</p>
-                                        <p className="text-sm text-slate-600 dark:text-slate-400">{course.duration}</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center">
-                                    <BarChart size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Level</p>
-                                        <p className="text-sm text-slate-600 dark:text-slate-400">{course.level}</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center">
-                                    <Award size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Certificate</p>
-                                        <p className="text-sm text-slate-600 dark:text-slate-400">Upon completion</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center">
-                                    <FileText size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Resources</p>
-                                        <p className="text-sm text-slate-600 dark:text-slate-400">3 downloadable resources</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center">
-                                    <BookOpen size={20} className="text-slate-500 dark:text-slate-400 mr-3" />
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Lessons</p>
-                                        <p className="text-sm text-slate-600 dark:text-slate-400">{userLessons.length} lessons</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {isEnrolled && (
-                                <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
-                                    <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-3">Course Progress</h3>
-                                    <div className="mb-2 flex justify-between items-center">
-                                        <span className="text-sm text-slate-600 dark:text-slate-400">
-                                            {Math.round(progress)}% complete
-                                        </span>
-                                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                                            {Math.round(Number(progress) / 100 * userLessons.length)} of {userLessons.length} lessons
-                                        </span>
-                                    </div>
-                                    <div className="w-full bg-slate-200 rounded-full h-2 mb-4 dark:bg-slate-700">
-                                        <div
-                                            className="bg-blue-600 h-2 rounded-full dark:bg-blue-500"
-                                            style={{ width: `${progress}%` }}
-                                        ></div>
-                                    </div>
-
-                                    {quizScore && (
-                                        <div className="mt-4 p-4 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-300 rounded-xl shadow flex flex-col items-center">
-                                            <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                                                <Award size={20} className="text-amber-500" /> Quiz Score
-                                            </h4>
-                                            <div className="flex flex-col items-center w-full">
-                                                {/* Progress Circle for Percentage */}
-                                                <div className="relative flex items-center justify-center mb-3">
-                                                    <svg width="64" height="64" viewBox="0 0 64 64">
-                                                        <circle cx="32" cy="32" r="28" fill="none" stroke="#dbeafe" strokeWidth="8" />
-                                                        <circle
-                                                            cx="32"
-                                                            cy="32"
-                                                            r="28"
-                                                            fill="none"
-                                                            stroke="#2563eb"
-                                                            strokeWidth="8"
-                                                            strokeDasharray={2 * Math.PI * 28}
-                                                            strokeDashoffset={2 * Math.PI * 28 * (1 - quizScore.percentage / 100)}
-                                                            strokeLinecap="round"
-                                                            style={{ transition: 'stroke-dashoffset 0.6s' }}
-                                                        />
-                                                        <text x="32" y="38" textAnchor="middle" fontSize="1.3em" fill="#2563eb" fontWeight="bold">
-                                                            {quizScore.percentage}%
-                                                        </text>
-                                                    </svg>
+                                        {progress === "100" && (
+                                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mb-8">
+                                                <div className="bg-green-100 rounded-full p-3 w-12 h-12 mx-auto mb-4">
+                                                    <CheckCircle size={24} className="text-green-600" />
                                                 </div>
-                                                <div className="flex flex-col gap-2 w-full mt-2">
-                                                    <div className="flex items-center gap-2 text-blue-800 text-base">
-                                                        <CheckCircle size={18} className="text-green-500" />
-                                                        <span>Correct Questions:</span>
-                                                        <span className="font-bold text-green-700">{quizScore.correctQuestions}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 text-blue-800 text-base">
-                                                        <BarChart size={18} className="text-blue-500" />
-                                                        <span>Percentage:</span>
-                                                        <span className="font-bold text-blue-700">{quizScore.percentage}%</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 text-blue-800 text-base">
-                                                        <Award size={18} className="text-amber-500" />
-                                                        <span>Points:</span>
-                                                        <span className="font-bold text-amber-600">{quizScore.points}</span>
-                                                    </div>
+                                                <p className="text-green-800 font-bold text-xl">Course Completed!</p>
+                                                <p className="text-green-700 mt-2">Congratulations on finishing the course successfully.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="bg-white border border-slate-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                                <CardContent className="p-10">
+                                    <h3 className="text-2xl font-bold text-slate-900 mb-8 flex items-center">
+                                        <div className="bg-slate-100 p-2 rounded-lg mr-3">
+                                            <Info size={24} className="text-slate-600" />
+                                        </div>
+                                        Course Details
+                                    </h3>
+                                    <div className="space-y-6">
+                                        <div className="flex items-center p-4 bg-slate-50 rounded-xl">
+                                            <div className="bg-blue-100 p-2 rounded-lg mr-4">
+                                                <Clock size={20} className="text-blue-600" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-900">Duration</p>
+                                                <p className="text-slate-600 font-medium">{course.duration}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center p-4 bg-slate-50 rounded-xl">
+                                            <div className="bg-green-100 p-2 rounded-lg mr-4">
+                                                <BarChart size={20} className="text-green-600" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-900">Level</p>
+                                                <p className="text-slate-600 font-medium">{course.level}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center p-4 bg-slate-50 rounded-xl">
+                                            <div className="bg-amber-100 p-2 rounded-lg mr-4">
+                                                <Award size={20} className="text-amber-600" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-900">Certificate</p>
+                                                <p className="text-slate-600 font-medium">Upon completion</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center p-4 bg-slate-50 rounded-xl">
+                                            <div className="bg-purple-100 p-2 rounded-lg mr-4">
+                                                <FileText size={20} className="text-purple-600" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-900">Lessons</p>
+                                                <p className="text-slate-600 font-medium">{userLessons.length} lessons</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {isEnrolled && quizScore && (
+                                        <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                                            <h4 className="font-bold text-blue-900 mb-4 flex items-center text-lg">
+                                                <TrendingUp size={20} className="mr-2" />
+                                                Quiz Performance
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-6 text-center">
+                                                <div className="bg-white p-4 rounded-lg shadow-sm">
+                                                    <div className="text-2xl font-bold text-blue-600">{quizScore.percentage}%</div>
+                                                    <div className="text-sm text-slate-600 font-medium">Score</div>
+                                                </div>
+                                                <div className="bg-white p-4 rounded-lg shadow-sm">
+                                                    <div className="text-2xl font-bold text-green-600">{quizScore.correctQuestions}</div>
+                                                    <div className="text-sm text-slate-600 font-medium">Correct</div>
                                                 </div>
                                             </div>
                                         </div>
                                     )}
-                                </div>
-                            )}
-                            {courseQuiz && (
-                                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex flex-col items-center">
-                                    <h3 className="text-lg font-semibold text-blue-900 mb-2">Available Quiz</h3>
-                                    <p className="mb-3 text-blue-800">{courseQuiz.title || 'Quiz'}</p>
-                                    <Link to={''}>
-                                        <Button variant="primary">Take Quiz</Button>
-                                    </Link>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+                )}
+
+                {/*  Significantly enhanced Live Sessions Section */}
+                {activeSection === 'sessions' && (
+                    <div className="max-w-5xl mx-auto">
+                        <div className="text-center mb-10">
+                            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full p-4 w-16 h-16 mx-auto mb-6 shadow-lg">
+                                <Video size={32} className="text-white" />
+                            </div>
+                            <h2 className="text-3xl font-bold text-slate-900 mb-4">Live Sessions</h2>
+                            <p className="text-slate-600 text-lg max-w-2xl mx-auto leading-relaxed">
+                                Join interactive live sessions with your instructor and fellow learners. Get real-time feedback and collaborate on projects.
+                            </p>
+                        </div>
+
+                        {isEnrolled ? (
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-8">
+                                <LearnerLiveSessions courseId={course.id} />
+                            </div>
+                        ) : (
+                            <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 shadow-lg">
+                                <CardContent className="p-12 text-center">
+                                    <div className="bg-slate-200 rounded-full p-6 w-20 h-20 mx-auto mb-8">
+                                        <Video size={32} className="text-slate-500" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-slate-900 mb-4">Enroll to Access Live Sessions</h3>
+                                    <p className="text-slate-600 mb-8 text-lg leading-relaxed max-w-md mx-auto">
+                                        Get access to interactive live sessions, Q&A with instructors, and real-time collaboration with other students.
+                                    </p>
+                                    <div className="space-y-4 mb-8">
+                                        <div className="flex items-center justify-center text-slate-600">
+                                            <CheckCircle size={20} className="text-green-500 mr-3" />
+                                            <span>Interactive live sessions</span>
+                                        </div>
+                                        <div className="flex items-center justify-center text-slate-600">
+                                            <CheckCircle size={20} className="text-green-500 mr-3" />
+                                            <span>Direct Q&A with instructors</span>
+                                        </div>
+                                        <div className="flex items-center justify-center text-slate-600">
+                                            <CheckCircle size={20} className="text-green-500 mr-3" />
+                                            <span>Collaborate with peers</span>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        onClick={() => handleEnroll(course.id)}
+                                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-10 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                                        leftIcon={<UserCheck size={24} />}
+                                    >
+                                        Enroll Now
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

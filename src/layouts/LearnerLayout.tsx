@@ -50,13 +50,13 @@ const LearnerLayout = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
       {/* Top Bar */}
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 fixed  w-full">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 fixed w-full z-50">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <Link to="/dashboard" className="flex items-center">
                 <img
-                  src="https://via.placeholder.com/40x40.png?text=GS"
+                  src="https://placehold.co/40x40?text=GS"
                   alt="GlobalSelect Academy"
                   className="h-10 w-10 mr-3"
                 />
@@ -84,7 +84,7 @@ const LearnerLayout = () => {
                 <div className="flex items-center">
                   <button className="flex items-center">
                     <img
-                      src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
+                      src={user?.avatar || "https://placehold.co/40x40?text=U"}
                       alt={user?.name}
                       className="h-8 w-8 rounded-full mr-2"
                     />
@@ -196,7 +196,7 @@ const LearnerLayout = () => {
             {sidebarCollapsed ? (
               <div className="flex flex-col items-center">
                 <img
-                  src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
+                  src={user?.avatar || "https://placehold.co/40x40?text=U"}
                   alt={user?.name}
                   className="h-10 w-10 rounded-full mb-2"
                 />
@@ -212,7 +212,7 @@ const LearnerLayout = () => {
               <div>
                 <div className="flex items-center mb-4">
                   <img
-                    src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
+                    src={user?.avatar || "https://placehold.co/40x40?text=U"}
                     alt={user?.name}
                     className="h-10 w-10 rounded-full mr-3"
                   />
@@ -234,8 +234,7 @@ const LearnerLayout = () => {
         </aside>
 
         {/* Main Content */}
-        <main className={`flex-1 ml-64 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-slate-900 dark:text-slate-100  
-          `}>
+        <main className={`flex-1 ml-64 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-slate-900 dark:text-slate-100 relative z-0`}>
 
           <Outlet />
 

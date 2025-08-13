@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { supabase } from '../lib/supabase';
+import type { RootState } from './index';
 
 interface Course {
     id: string;
@@ -25,9 +26,15 @@ interface CourseState {
     currentCourse: Course | null;
     loading: boolean;
     error: string | null;
+    loaded: boolean;
+    lastFetchedAt?: number;
 }
 
-export const fetchCourses = createAsyncThunk(
+export const fetchCourses = createAsyncThunk<
+    Course[],
+    void,
+    { state: RootState; rejectValue: string }
+>(
     'courses/fetchCourses',
     async (_, { rejectWithValue }) => {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -35,7 +42,16 @@ export const fetchCourses = createAsyncThunk(
         }
         const { data, error } = await supabase.from('courses').select('*,enrollments:course_enrollments(count)');
         if (error) return rejectWithValue(error.message);
-        return data;
+        return (data || []) as Course[];
+    },
+    {
+        condition: (_, { getState }) => {
+            const state = getState();
+            const { loaded, loading } = state.courses;
+            // Skip if already loaded or currently loading
+            if (loaded || loading) return false;
+            return true;
+        },
     }
 );
 
@@ -110,6 +126,7 @@ const coursesSlice = createSlice({
         currentCourse: null as Course | null,
         loading: false,
         error: null as string | null,
+        loaded: false,
     } as CourseState,
     reducers: {
         clearCurrentCourse: (state) => {
@@ -117,6 +134,9 @@ const coursesSlice = createSlice({
         },
         clearError: (state) => {
             state.error = null;
+        },
+        invalidateCourses: (state) => {
+            state.loaded = false;
         },
     },
     extraReducers: (builder) => {
@@ -129,6 +149,8 @@ const coursesSlice = createSlice({
             .addCase(fetchCourses.fulfilled, (state, action) => {
                 state.loading = false;
                 state.data = action.payload;
+                state.loaded = true;
+                state.lastFetchedAt = Date.now();
             })
             .addCase(fetchCourses.rejected, (state, action) => {
                 state.loading = false;

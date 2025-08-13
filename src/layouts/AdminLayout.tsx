@@ -52,7 +52,7 @@ const AdminLayout = () => {
       <div className="md:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center">
           <img
-            src="https://via.placeholder.com/40x40.png?text=GS"
+            src="https://placehold.co/40x40?text=GS"
             alt="GlobalSelect Academy"
             className="h-10 w-10 mr-3"
           />
@@ -91,7 +91,7 @@ const AdminLayout = () => {
               <div className="px-4 mb-6">
                 <div className="flex items-center">
                   <img
-                    src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
+                    src={user?.avatar || "https://placehold.co/40x40?text=U"}
                     alt={user?.name}
                     className="h-12 w-12 rounded-full mr-3"
                   />
@@ -144,7 +144,7 @@ const AdminLayout = () => {
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div className={`flex items-center ${collapsed ? 'justify-center w-full' : ''}`}>
               <img
-                src="https://via.placeholder.com/40x40.png?text=GS"
+                src="https://placehold.co/40x40?text=GS"
                 alt="GlobalSelect Academy"
                 className="h-10 w-10"
               />
@@ -199,7 +199,7 @@ const AdminLayout = () => {
             {collapsed ? (
               <div className="flex flex-col items-center">
                 <img
-                  src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
+                  src={user?.avatar || "https://placehold.co/40x40?text=U"}
                   alt={user?.name}
                   className="h-10 w-10 rounded-full mb-2"
                 />
@@ -215,7 +215,7 @@ const AdminLayout = () => {
               <div>
                 <div className="flex items-center mb-4">
                   <img
-                    src={user?.avatar || "https://via.placeholder.com/40x40.png?text=U"}
+                    src={user?.avatar || "https://placehold.co/40x40?text=U"}
                     alt={user?.name}
                     className="h-10 w-10 rounded-full mr-3"
                   />

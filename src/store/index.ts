@@ -5,6 +5,7 @@ import coursesReducer from './coursesSlice';
 import enrollmentsReducer from './enrollmentsSlice';
 import usersReducer from './usersSlice';
 import quizzesReducer from './quizzesSlice';
+import notesReducer from './notesSlice';
 // import other slices as needed
 
 export const store = configureStore({
@@ -14,6 +15,7 @@ export const store = configureStore({
         enrollments: enrollmentsReducer,
         users: usersReducer,
         quizzes: quizzesReducer,
+        notes: notesReducer,
         // ...other slices
     },
 });
