@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Plus, Filter, Edit, Trash2, MoreVertical, User, Mail, Calendar, Shield } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Search, Plus, Edit, Trash2, MoreVertical, User, Mail, Shield } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { useToast } from '../../../components/ui/Toaster';
 import { supabase } from '../../../lib/supabase';
+import { useUser } from '../../../contexts/UserContext';
 
 // Types
 interface UserData {
@@ -12,7 +13,7 @@ interface UserData {
   name: string;
   email: string;
   role: string;
-  department: string;
+
   joinDate: string;
   status: 'active' | 'inactive' | 'pending';
   lastLogin?: string;
@@ -20,19 +21,26 @@ interface UserData {
 
 const UserManagement = () => {
   const { addToast } = useToast();
+  const { user: currentUser } = useUser();
+  const isSuperadmin = currentUser?.role === 'superadmin';
+  const isAdmin = currentUser?.role === 'admin';
+  const canDeleteUsers = isSuperadmin;
+  const [users, setUsers] = useState<UserData[]>([]);
+  const existingManagerCount = useMemo(() => users.filter(u => u.role === 'Manager').length, [users]);
+  const managerSlotAvailable = existingManagerCount === 0;
+  const canAddManagers = (isSuperadmin || isAdmin) && managerSlotAvailable;
+  const canAddAdmins = isSuperadmin;
 
   // Dynamic user data
-  const [users, setUsers] = useState<UserData[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchUsers = async () => {
-      setLoading(true);
+      // start loading (optional UI)
       try {
         // Fetch users from 'users' table
         const { data: usersData, error: usersError } = await supabase
           .from('users')
-          .select('id, name, email, department, created_at');
+          .select('id, name, email, created_at');
         if (usersError) throw usersError;
 
         // Fetch roles from 'user_roles' table
@@ -46,15 +54,17 @@ const UserManagement = () => {
         // Merge users and roles
         const merged = usersData.map((user: any) => {
           const roleEntry = rolesData.find((r: any) => r.user_id === user.id);
+          const r = (roleEntry?.role || '').toLowerCase();
+          const prettyRole = r === 'superadmin' ? 'Superadmin' : r === 'admin' ? 'Admin' : r === 'manager' ? 'Manager' : 'Learner';
           return {
             id: user.id,
             name: user.name,
             email: user.email,
-            department: user.department,
+
             joinDate: user.created_at ? user.created_at.split('T')[0] : '',
-            role: roleEntry ? (roleEntry.role === 'superadmin' ? 'Superadmin' : 'Learner') : 'Learner',
-            status: 'active' as 'active', // Default, unless you have a status field
-            lastLogin: undefined // Default, unless you have a lastLogin field
+            role: prettyRole,
+            status: 'active' as 'active',
+            lastLogin: undefined
           };
         });
         setUsers(merged);
@@ -66,7 +76,7 @@ const UserManagement = () => {
           duration: 4000,
         });
       } finally {
-        setLoading(false);
+        // end loading
       }
     };
     fetchUsers();
@@ -76,13 +86,13 @@ const UserManagement = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
-  const [selectedDepartment, setSelectedDepartment] = useState('All');
+  // No department filtering in current schema
+
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
-    role: 'Learner',
-    department: '',
+    role: 'Admin',
   });
 
   // State for delete confirmation popup
@@ -96,9 +106,7 @@ const UserManagement = () => {
       user.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = selectedRole === 'All' || user.role === selectedRole;
     const matchesStatus = selectedStatus === 'All' || user.status === selectedStatus.toLowerCase();
-    const matchesDepartment = selectedDepartment === 'All' || user.department === selectedDepartment;
-
-    return matchesSearch && matchesRole && matchesStatus && matchesDepartment;
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
 
@@ -111,47 +119,51 @@ const UserManagement = () => {
   // Handler for confirming deletion
   const confirmDeleteUser = async () => {
     if (!userToDelete) return;
-    setDeleting(true);
-    try {
-      // Remove from user_roles
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userToDelete.id);
-      if (roleError) throw roleError;
 
-      // Remove from users
-      const { error: usersError } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', userToDelete.id);
-      if (usersError) throw usersError;
-
-      // Remove from auth.users (Supabase admin API)
-      // This requires service role key and should be done via a secure backend function in production.
-      // For demonstration, we'll call the Supabase admin API if available.
-      const { error: authError } = await supabase.auth.admin.deleteUser(userToDelete.id);
-      if (authError) throw authError;
-
-      setUsers(users.filter(user => user.id !== userToDelete.id));
+    // Only superadmin can delete
+    if (!canDeleteUsers) {
       addToast({
-        type: 'success',
-        title: 'User deleted successfully',
+        type: "error",
+        title: "Permission denied",
+        message: "Only superadmins can delete users.",
+      });
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      // Prevent deleting own account
+      if (currentUser?.id && userToDelete.id === currentUser.id) {
+        throw new Error('You cannot delete your own account.');
+      }
+
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { id: userToDelete.id },
+      });
+      if (error) throw new Error((data as any)?.error || error.message || 'Failed to delete user');
+
+      // Remove user from state
+      setUsers(users.filter((u) => u.id !== userToDelete.id));
+
+      addToast({
+        type: "success",
+        title: "User deleted",
+        message: `User ${userToDelete.name} was deleted successfully.`,
         duration: 3000,
       });
     } catch (error: any) {
       addToast({
-        type: 'error',
-        title: 'Failed to delete user',
-        message: error.message || 'An error occurred while deleting the user.',
+        type: "error",
+        title: "Failed to delete user",
+        message: error.message || "Something went wrong.",
         duration: 4000,
       });
     } finally {
       setDeleting(false);
-      setUserToDelete(null);
+      setUserToDelete(null); // close modal
     }
   };
-
   // Handler for canceling deletion
   const cancelDeleteUser = () => {
     setUserToDelete(null);
@@ -197,6 +209,7 @@ const UserManagement = () => {
               >
                 <option value="All">All Roles</option>
                 <option value="Admin">Admin</option>
+                <option value="Manager">Manager</option>
                 <option value="Learner">Learner</option>
               </select>
 
@@ -211,18 +224,7 @@ const UserManagement = () => {
                 <option value="Pending">Pending</option>
               </select>
 
-              <select
-                className="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={selectedDepartment}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
-              >
-                <option value="All">All Departments</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Sales">Sales</option>
-                <option value="HR">HR</option>
-                <option value="Finance">Finance</option>
-                <option value="Product">Product</option>
-              </select>
+
             </div>
           </div>
         </div>
@@ -237,9 +239,7 @@ const UserManagement = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Department
-                </th>
+
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Join Date
                 </th>
@@ -277,9 +277,7 @@ const UserManagement = () => {
                         {user.role}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      {user.department}
-                    </td>
+
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                       {user.joinDate}
                     </td>
@@ -301,13 +299,15 @@ const UserManagement = () => {
                         <button className="text-blue-600 hover:text-blue-900">
                           <Edit className="h-4 w-4" />
                         </button>
-                        <button
-                          className="text-red-600 hover:text-red-900"
-                          onClick={() => handleDeleteUser(user)}
-                          disabled={deleting}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canDeleteUsers && (
+                          <button
+                            className="text-red-600 hover:text-red-900"
+                            onClick={() => handleDeleteUser(user)}
+                            disabled={deleting}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                         <button className="text-slate-400 hover:text-slate-600">
                           <MoreVertical className="h-4 w-4" />
                         </button>
@@ -388,34 +388,10 @@ const UserManagement = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Department Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {Array.from(new Set(users.map(user => user.department))).map(department => {
-                const count = users.filter(user => user.department === department).length;
-                const percentage = Math.round((count / users.length) * 100);
 
-                return (
-                  <div key={department}>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium text-slate-700">{department}</span>
-                      <span className="text-sm font-medium text-slate-700">{percentage}%</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+
+
+
       </div>
 
       {/* Add User Modal */}
@@ -469,24 +445,22 @@ const UserManagement = () => {
                     value={newUser.role}
                     onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                   >
-                    <option value="Learner">Learner</option>
-                    <option value="Admin">Admin</option>
+                    {canAddAdmins && <option value="Admin">Admin</option>}
+                    {(isSuperadmin || isAdmin) && (
+                      <option value="Manager" disabled={!managerSlotAvailable}>
+                        {managerSlotAvailable ? 'Manager' : 'Manager (already assigned)'}
+                      </option>
+                    )}
+                    {/* Show Teacher and Learner when manager is logged in */}
+                    {currentUser?.role === 'manager' && <option value="Teacher">Teacher</option>}
+                    {currentUser?.role === 'manager' && <option value="Learner">Learner</option>}
                   </select>
+                  {(isSuperadmin || isAdmin) && !managerSlotAvailable && (
+                    <p className="mt-1 text-xs text-slate-500">A Manager already exists. Only one Manager is allowed.</p>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Department
-                </label>
-                <input
-                  type="text"
-                  className="block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="Enter department"
-                  value={newUser.department}
-                  onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
-                />
-              </div>
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
@@ -497,13 +471,73 @@ const UserManagement = () => {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  // Functionality removed - just close the modal
-                  setShowAddUserModal(false);
-                  setNewUser({ name: '', email: '', role: 'Learner', department: '' });
+                onClick={async () => {
+                  try {
+                    if (!newUser.email || !newUser.name) return;
+
+                    // Determine role to send
+                    // Role assignment rules
+                    let sendRole = newUser.role.toLowerCase();
+                    if (isAdmin) {
+                      // Admin can only add managers, and only if no existing manager
+                      if (!managerSlotAvailable) {
+                        throw new Error('There can be only one Manager.');
+                      }
+                      sendRole = 'manager';
+                    } else if (currentUser?.role === 'manager') {
+                      // Manager can add teachers and learners only
+                      const lower = sendRole;
+                      if (lower !== 'teacher' && lower !== 'learner') {
+                        throw new Error('Managers can invite only Teachers or Learners.');
+                      }
+                    }
+
+                    // build params safely
+                    const params = new URLSearchParams({
+                      email: newUser.email,
+                      name: newUser.name,
+                      role: sendRole,
+                    }).toString();
+
+                    const redirectTo = `${window.location.origin}/accept-invite?${params}`;
+
+                    // Enforce role creation rules on client: only superadmin can add Admin; admin/superadmin can add Manager
+                    const desiredRole = sendRole;
+                    if (desiredRole === 'admin' && !canAddAdmins) {
+                      throw new Error('Only superadmins can add Admins.');
+                    }
+                    if (desiredRole === 'manager' && !canAddManagers) {
+                      throw new Error(managerSlotAvailable ? 'You do not have permission to add Managers.' : 'There can be only one Manager.');
+                    }
+
+                    // send Supabase magic link with redirect
+                    const { error } = await supabase.auth.signInWithOtp({
+                      email: newUser.email,
+                      options: {
+                        emailRedirectTo: redirectTo,
+                      },
+                    });
+
+                    if (error) throw error;
+
+                    addToast({
+                      type: 'success',
+                      title: 'Invitation sent',
+                      message: `Invite sent to ${newUser.email}`,
+                    });
+
+                    setShowAddUserModal(false);
+                    setNewUser({ name: '', email: '', role: 'Admin' });
+                  } catch (e: any) {
+                    addToast({
+                      type: 'error',
+                      title: 'Failed to send invite',
+                      message: e?.message || 'Try again.',
+                    });
+                  }
                 }}
               >
-                Add User
+                Send Invitation
               </Button>
             </div>
           </div>
@@ -515,11 +549,25 @@ const UserManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6 m-4">
             <h2 className="text-xl font-bold text-slate-900 mb-4">Confirm Delete</h2>
-            <p className="mb-6">Are you sure you want to delete user <span className="font-semibold">{userToDelete.name}</span>? This action cannot be undone.</p>
+            <p className="mb-6">
+              Are you sure you want to delete user{" "}
+              <span className="font-semibold">{userToDelete.name}</span>? This action cannot be undone.
+            </p>
             <div className="flex justify-end space-x-3">
-              <Button variant="outline" onClick={cancelDeleteUser} disabled={deleting}>Cancel</Button>
-              <Button variant="danger" onClick={confirmDeleteUser} isLoading={deleting} disabled={deleting}>
-                {deleting ? 'Deleting...' : 'Delete'}
+              <Button
+                variant="outline"
+                onClick={() => setUserToDelete(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={confirmDeleteUser}
+                isLoading={deleting}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Delete"}
               </Button>
             </div>
           </div>

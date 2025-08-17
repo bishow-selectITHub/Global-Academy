@@ -7,31 +7,12 @@ import Input from '../../../components/ui/Input';
 import { useToast } from '../../../components/ui/Toaster';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../../store';
+import type { AppDispatch } from '../../../store';
 import { useUser } from '../../../contexts/UserContext';
 import { supabase } from '../../../lib/supabase';
-import { fetchEnrollments } from '../../../store/enrollmentsSlice';
+import { fetchEnrollments, invalidateEnrollmentsForUser } from '../../../store/enrollmentsSlice';
 
-interface Lesson {
-  id: string;
-  type: 'video' | 'text' | 'quiz';
-  title: string;
-  video?: any;
-  duration: string;
-  videoUrl: string;
-  content?: string;
-}
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail: string;
-  level: string;
-  duration: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+// Removed unused local interfaces
 
 const EnrollPage = () => {
   const { user } = useUser();
@@ -39,7 +20,7 @@ const EnrollPage = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
 
   // Defensive check for courses slice
   const courseSlice = useSelector((state: RootState) => state.courses || { data: [] });
@@ -107,8 +88,9 @@ const EnrollPage = () => {
           message: 'You are already enrolled in this course.',
           duration: 3000,
         });
-        // Refetch enrollments and redirect
-        dispatch(fetchEnrollments(user.id));
+        // Invalidate and refetch enrollments, then redirect
+        dispatch(invalidateEnrollmentsForUser(user.id));
+        await dispatch(fetchEnrollments(user.id));
         navigate(`/courses/${course.id}`);
         return;
       }
@@ -137,8 +119,9 @@ const EnrollPage = () => {
           message: 'You have been enrolled in the course.',
           duration: 3000,
         });
-        // Refetch enrollments and redirect
-        dispatch(fetchEnrollments(user.id));
+        // Invalidate and refetch enrollments, then redirect
+        dispatch(invalidateEnrollmentsForUser(user.id));
+        await dispatch(fetchEnrollments(user.id));
         navigate(`/courses/${course.id}`);
         return;
       }

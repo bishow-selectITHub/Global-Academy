@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/Toaster';
 
-export type UserRole = 'superadmin' | 'learner';
+export type UserRole = 'superadmin' | 'learner' | 'admin' | 'manager' | 'teacher';
 
 export interface User {
   id: string;
@@ -18,7 +18,20 @@ interface UserContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    extras?: {
+      registrationNo?: string;
+      companyName?: string;
+      domain?: string;
+      companyStamp?: string;
+      companyDoc?: string;
+      phone?: string;
+      location?: string;
+    }
+  ) => Promise<void>;
   isAuthenticated: boolean;
   isAdmin: boolean;
 }
@@ -59,7 +72,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
           const { data: userData } = await supabase.auth.getUser();
 
           if (userData?.user) {
-            let role: UserRole = 'learner'; // Default role
+            let role: UserRole = 'superadmin'; // Default role
 
             if (userData.user.user_metadata?.role) {
               role = userData.user.user_metadata.role as UserRole;
@@ -137,7 +150,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       });
 
       // Navigate based on role
-      if (role === 'superadmin') {
+      if (role === 'superadmin' || role === "admin") {
         navigate('/admin');
       } else {
         navigate('/dashboard');
@@ -178,7 +191,20 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     }
   }, [addToast, navigate]);
 
-  const register = useCallback(async (name: string, email: string, password: string) => {
+  const register = useCallback(async (
+    name: string,
+    email: string,
+    password: string,
+    extras?: {
+      registrationNo?: string;
+      companyName?: string;
+      domain?: string;
+      companyStamp?: string;
+      companyDoc?: string;
+      phone?: string;
+      location?: string;
+    }
+  ) => {
     setIsLoading(true);
     try {
       // Sign up with Supabase (store name in user_metadata)
@@ -186,7 +212,17 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         email,
         password,
         options: {
-          data: { name }
+          data: {
+            name,
+            role: 'superadmin',
+            registrationNo: extras?.registrationNo || '',
+            companyName: extras?.companyName || '',
+            domain: extras?.domain || '',
+            companyStamp: extras?.companyStamp || '',
+            companyDoc: extras?.companyDoc || '',
+            phone: extras?.phone || '',
+            location: extras?.location || ''
+          }
         }
       });
 
@@ -197,7 +233,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       // Insert role into user_roles table
       const { error: roleError } = await supabase
         .from('user_roles')
-        .insert([{ user_id: signUpData.user.id, role: 'learner' }]);
+        .insert([{ user_id: signUpData.user.id, role: 'superadmin' }]);
 
       if (roleError) {
         throw roleError;
@@ -210,14 +246,14 @@ export const UserProvider = ({ children }: UserProviderProps) => {
           id: signUpData.user.id,
           name: name,
           email: email,
-          phone: '',
-          location: '',
-          avatar: '',
-          department: '',
-          position: '',
-          bio: '',
-          education: JSON.stringify([]),
-          skills: JSON.stringify([]),
+          phone: extras?.phone || '',
+          location: extras?.location || '',
+
+          registrationNo: extras?.registrationNo || '',
+          companyName: extras?.companyName || '',
+          domain: extras?.domain || '',
+          companyStamp: extras?.companyStamp || '',
+          companyDoc: extras?.companyDoc || ''
         });
 
       if (profileError) {
@@ -251,7 +287,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     logout,
     register,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'superadmin'
+    isAdmin: user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'manager'
   }), [user, isLoading, login, logout, register]);
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

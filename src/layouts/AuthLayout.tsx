@@ -1,12 +1,14 @@
-import { ReactNode } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+//
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 
 const AuthLayout = () => {
   const { isAuthenticated, isAdmin } = useUser();
+  const location = useLocation();
+  const isAcceptInvite = location.pathname === '/accept-invite';
 
   // Redirect if already authenticated
-  if (isAuthenticated) {
+  if (isAuthenticated && !isAcceptInvite) {
     return <Navigate to={isAdmin ? '/admin' : '/dashboard'} replace />;
   }
 
@@ -14,7 +16,7 @@ const AuthLayout = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <div className="flex-1 flex flex-col sm:flex-row">
         {/* Brand section (left on desktop, top on mobile) */}
-        <div className="bg-blue-900 text-white sm:w-1/2 p-8 flex flex-col justify-center">
+        <div className="h-screen sticky top-0 bottom-0 bg-gradient-to-b from-blue-900 to-blue-800 text-white sm:w-1/2 p-8 lg:p-12 flex flex-col justify-center">
           <div className="max-w-md mx-auto">
             <div className="flex items-center mb-8">
               <img
@@ -51,8 +53,8 @@ const AuthLayout = () => {
         </div>
 
         {/* Auth form section */}
-        <div className="sm:w-1/2 flex justify-center items-center p-8">
-          <div className="w-full max-w-md">
+        <div className="sm:w-1/2 flex  justify-center items-center  lg:py-8 ">
+          <div className="w-full max-w-2xl">
             <Outlet />
           </div>
         </div>

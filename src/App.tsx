@@ -43,6 +43,7 @@ import MyDocuments from './pages/learner/documents/MyDocuments';
 import MyAssets from './pages/learner/assets/MyAssets';
 import LearningInsights from './pages/learner/learning-insights/LearningInsights';
 import LiveSessionJoin from './pages/learner/courses/LiveSessionJoin';
+import AcceptInvitation from './pages/auth/AcceptInvitation';
 
 // Guards
 import AuthGuard from './components/guards/AuthGuard';
@@ -98,13 +99,14 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/accept-invite" element={<AcceptInvitation />} />
               </Route>
 
               {/* Admin Routes */}
               <Route
                 element={
                   <AuthGuard>
-                    <RoleGuard allowedRoles={['superadmin']}>
+                    <RoleGuard allowedRoles={['superadmin', 'admin', 'manager']}>
                       <AdminLayout />
                     </RoleGuard>
                   </AuthGuard>
