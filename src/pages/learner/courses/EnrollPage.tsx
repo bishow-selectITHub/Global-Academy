@@ -102,7 +102,8 @@ const EnrollPage = () => {
         .insert({
           user_id: user.id,
           course_id: course.id,
-
+          progress: "0",
+          enrolled_at: new Date(),
           lessons: [],
 
         })

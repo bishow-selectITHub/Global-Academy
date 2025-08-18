@@ -12,6 +12,7 @@ import { RootState } from '../../../store';
 
 import { supabase } from '../../../lib/supabase';
 import { HMSRoomProvider } from "@100mslive/react-sdk";
+import HMSRoomKitHost from '../../../components/live/HMSRoomKitHost';
 
 const GENERATE_TOKEN_ENDPOINT = "https://smqnaddacvwwuehxymbr.supabase.co/functions/v1/generate-hms-token";
 
@@ -21,6 +22,7 @@ const GENERATE_TOKEN_ENDPOINT = "https://smqnaddacvwwuehxymbr.supabase.co/functi
 const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
     const [sessions, setSessions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [joinProps, setJoinProps] = useState<{ token: string; userName: string } | null>(null);
     // modal state removed
 
     useEffect(() => {
@@ -79,7 +81,6 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
             if (!res.ok) throw new Error(data.error || 'Failed to generate 100ms token');
 
             const realSessionId = activeSessionId || data.session_id || data.sessionInstanceId;
-            console.log(realSessionId)
             if (realSessionId) {
                 const { data: existing, error: fetchExistingError } = await supabase
                     .from('students_attendance')
@@ -104,8 +105,8 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
                 }
             }
 
-            const joinUrl = `/live/join?token=${encodeURIComponent(data.token)}&userName=${encodeURIComponent(user.id)}`;
-            window.open(joinUrl, '_blank', 'noopener,noreferrer');
+            // Render 100ms SDK inline (same tab)
+            setJoinProps({ token: data.token, userName: user.id });
         } catch (err: any) {
             alert(err.message);
         }
@@ -117,6 +118,19 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
             <span className="ml-3 text-slate-600">Loading live sessions...</span>
         </div>
     );
+
+    // If joining, render HMS Room Prebuilt inline
+    if (joinProps) {
+        return (
+            <div className="fixed inset-0 z-50 bg-black">
+                <HMSRoomKitHost
+                    token={joinProps.token}
+                    userName={joinProps.userName}
+                    onRoomEnd={() => setJoinProps(null)}
+                />
+            </div>
+        );
+    }
 
     return (
         <HMSRoomProvider>

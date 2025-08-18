@@ -13,6 +13,7 @@ import { useUser } from './contexts/UserContext';
 import AdminLayout from './layouts/AdminLayout';
 import LearnerLayout from './layouts/LearnerLayout';
 import AuthLayout from './layouts/AuthLayout';
+import TeacherLayout from './layouts/TeacherLayout';
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -31,6 +32,8 @@ import UserManagement from './pages/admin/users/UserManagement';
 import AssetManagement from './pages/admin/assets/AssetManagement';
 import AnalyticsDashboard from './pages/admin/analytics/AnalyticsDashboard';
 import CourseView from './pages/learner/courses/CourseView';
+import TeacherDashboard from './pages/teacher/Dashboard';
+
 
 // Learner Pages
 import LearnerDashboard from './pages/learner/Dashboard';
@@ -42,7 +45,7 @@ import MyProfile from './pages/learner/profile/MyProfile';
 import MyDocuments from './pages/learner/documents/MyDocuments';
 import MyAssets from './pages/learner/assets/MyAssets';
 import LearningInsights from './pages/learner/learning-insights/LearningInsights';
-import LiveSessionJoin from './pages/learner/courses/LiveSessionJoin';
+
 import AcceptInvitation from './pages/auth/AcceptInvitation';
 
 // Guards
@@ -125,6 +128,19 @@ function App() {
                 <Route path="/admin/analytics" element={<AnalyticsDashboard />} />
               </Route>
 
+              {/* Teacher Routes */}
+              <Route
+                element={
+                  <AuthGuard>
+                    <RoleGuard allowedRoles={['teacher']}>
+                      <TeacherLayout />
+                    </RoleGuard>
+                  </AuthGuard>
+                }
+              >
+                <Route path="/teacher" element={<TeacherDashboard />} />
+              </Route>
+
               {/* Learner Routes */}
               <Route
                 element={
@@ -138,7 +154,7 @@ function App() {
                 <Route path="/dashboard" element={<LearnerDashboard />} />
                 <Route path="/courses" element={<CourseCatalog />} />
                 <Route path="/courses/:id" element={<CourseView />} />
-                <Route path="/live/join" element={<LiveSessionJoin />} />
+
                 <Route path="/enroll/:courseId" element={<EnrollPage />} />
                 <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonView />} />
                 <Route path="/courses/:courseId/quiz" element={<QuizAttempt />} />
@@ -152,6 +168,8 @@ function App() {
 
               {/* Default Route */}
               <Route path="/" element={<Navigate to="/login" replace />} />
+              {/* Public Live Join (token protected) */}
+
             </Routes>
 
 

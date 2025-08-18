@@ -12,7 +12,9 @@ const RoleGuard = ({ children, allowedRoles }: RoleGuardProps) => {
 
   if (!user || !allowedRoles.includes(user.role)) {
     // Redirect to appropriate dashboard based on role
-    return <Navigate to={isAdmin ? '/admin' : '/dashboard'} replace />;
+    if (isAdmin) return <Navigate to="/admin" replace />;
+    if (user?.role === 'teacher') return <Navigate to="/teacher" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

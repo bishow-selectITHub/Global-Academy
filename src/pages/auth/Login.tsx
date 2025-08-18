@@ -85,6 +85,7 @@ const Login = () => {
           fullWidth
           className='p-2'
           autoComplete="email"
+          disabled={isLoading || userLoading}
         />
 
         <Input
@@ -99,6 +100,7 @@ const Login = () => {
           error={errors.password}
           fullWidth
           autoComplete="current-password"
+          disabled={isLoading || userLoading}
         />
 
         <div className="flex items-center justify-between">
@@ -108,6 +110,7 @@ const Login = () => {
               name="remember-me"
               type="checkbox"
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
+              disabled={isLoading || userLoading}
             />
             <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600">
               Remember me
@@ -122,8 +125,8 @@ const Login = () => {
         </div>
 
         <div>
-          <Button type="submit" fullWidth isLoading={isLoading}>
-            Sign in
+          <Button type="submit" fullWidth isLoading={isLoading || userLoading} disabled={userLoading}>
+            {userLoading ? 'Logging in…' : 'Sign in'}
           </Button>
         </div>
 

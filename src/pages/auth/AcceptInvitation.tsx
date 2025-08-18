@@ -194,6 +194,7 @@ const AcceptInvitation = () => {
             </div>
             <div className="space-y-4">
                 <Input
+                    className='p-2'
                     id="email"
                     label="Email"
                     value={emailFromSession || invitedEmail}
@@ -202,6 +203,7 @@ const AcceptInvitation = () => {
                 />
                 <Input
                     id="password"
+                    className='p-2'
                     type="password"
                     label="Password"
                     placeholder="••••••••"
@@ -210,6 +212,7 @@ const AcceptInvitation = () => {
                     fullWidth
                 />
                 <Input
+                    className='p-2'
                     id="confirmPassword"
                     type="password"
                     label="Confirm Password"

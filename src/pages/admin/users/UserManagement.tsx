@@ -26,6 +26,7 @@ const UserManagement = () => {
   const isAdmin = currentUser?.role === 'admin';
   const canDeleteUsers = isSuperadmin;
   const [users, setUsers] = useState<UserData[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const existingManagerCount = useMemo(() => users.filter(u => u.role === 'Manager').length, [users]);
   const managerSlotAvailable = existingManagerCount === 0;
   const canAddManagers = (isSuperadmin || isAdmin) && managerSlotAvailable;
@@ -35,7 +36,7 @@ const UserManagement = () => {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      // start loading (optional UI)
+      setLoadingUsers(true);
       try {
         // Fetch users from 'users' table
         const { data: usersData, error: usersError } = await supabase
@@ -55,7 +56,16 @@ const UserManagement = () => {
         const merged = usersData.map((user: any) => {
           const roleEntry = rolesData.find((r: any) => r.user_id === user.id);
           const r = (roleEntry?.role || '').toLowerCase();
-          const prettyRole = r === 'superadmin' ? 'Superadmin' : r === 'admin' ? 'Admin' : r === 'manager' ? 'Manager' : 'Learner';
+          const prettyRole =
+            r === 'superadmin'
+              ? 'Superadmin'
+              : r === 'admin'
+                ? 'Admin'
+                : r === 'manager'
+                  ? 'Manager'
+                  : r === 'teacher'
+                    ? 'Teacher'
+                    : 'Learner';
           return {
             id: user.id,
             name: user.name,
@@ -76,7 +86,7 @@ const UserManagement = () => {
           duration: 4000,
         });
       } finally {
-        // end loading
+        setLoadingUsers(false);
       }
     };
     fetchUsers();
@@ -178,7 +188,12 @@ const UserManagement = () => {
         </div>
         <Button
           leftIcon={<Plus size={16} />}
-          onClick={() => setShowAddUserModal(true)}
+          onClick={() => {
+            // Set sensible default role based on current user's role
+            const defaultRole = isSuperadmin ? 'Admin' : isAdmin ? 'Manager' : currentUser?.role === 'manager' ? 'Teacher' : 'Learner';
+            setNewUser({ name: '', email: '', role: defaultRole as any });
+            setShowAddUserModal(true);
+          }}
         >
           Add New User
         </Button>
@@ -186,6 +201,14 @@ const UserManagement = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        {loadingUsers && (
+          <div className="p-6 border-b border-slate-200">
+            <div className="flex items-center gap-3 text-slate-600">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
+              <span>Loading users…</span>
+            </div>
+          </div>
+        )}
         <div className="p-6 border-b border-slate-200">
           <div className="flex flex-col md:flex-row justify-between gap-4">
             <div className="relative flex-1">
@@ -210,6 +233,7 @@ const UserManagement = () => {
                 <option value="All">All Roles</option>
                 <option value="Admin">Admin</option>
                 <option value="Manager">Manager</option>
+                <option value="Teacher">Teacher</option>
                 <option value="Learner">Learner</option>
               </select>
 
@@ -255,7 +279,16 @@ const UserManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
-              {filteredUsers.length > 0 ? (
+              {loadingUsers ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-600">
+                    <div className="inline-flex items-center gap-3">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
+                      <span>Loading users…</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -270,10 +303,18 @@ const UserManagement = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs rounded-full ${user.role === 'Admin'
-                        ? 'bg-purple-100 text-purple-800'
-                        : 'bg-blue-100 text-blue-800'
-                        }`}>
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${user.role.toLowerCase() === 'superadmin'
+                          ? 'bg-blue-100 text-blue-800'
+                          : user.role.toLowerCase() === 'admin'
+                            ? 'bg-green-100 text-green-800'
+                            : user.role.toLowerCase() === 'teacher'
+                              ? 'bg-orange-100 text-orange-800'
+                              : user.role.toLowerCase() === 'learner'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-slate-100 text-slate-700'
+                          }`}
+                      >
                         {user.role}
                       </span>
                     </td>
@@ -451,9 +492,9 @@ const UserManagement = () => {
                         {managerSlotAvailable ? 'Manager' : 'Manager (already assigned)'}
                       </option>
                     )}
-                    {/* Show Teacher and Learner when manager is logged in */}
-                    {currentUser?.role === 'manager' && <option value="Teacher">Teacher</option>}
-                    {currentUser?.role === 'manager' && <option value="Learner">Learner</option>}
+                    {/* Teacher and Learner options */}
+                    {(isSuperadmin || isAdmin || currentUser?.role === 'manager') && <option value="Teacher">Teacher</option>}
+                    {(isSuperadmin || isAdmin || currentUser?.role === 'manager') && <option value="Learner">Learner</option>}
                   </select>
                   {(isSuperadmin || isAdmin) && !managerSlotAvailable && (
                     <p className="mt-1 text-xs text-slate-500">A Manager already exists. Only one Manager is allowed.</p>
@@ -491,6 +532,7 @@ const UserManagement = () => {
                         throw new Error('Managers can invite only Teachers or Learners.');
                       }
                     }
+                    // Superadmin can add all roles; no override needed
 
                     // build params safely
                     const params = new URLSearchParams({
@@ -527,7 +569,8 @@ const UserManagement = () => {
                     });
 
                     setShowAddUserModal(false);
-                    setNewUser({ name: '', email: '', role: 'Admin' });
+                    const defaultRole = isSuperadmin ? 'Admin' : isAdmin ? 'Manager' : currentUser?.role === 'manager' ? 'Teacher' : 'Learner';
+                    setNewUser({ name: '', email: '', role: defaultRole as any });
                   } catch (e: any) {
                     addToast({
                       type: 'error',

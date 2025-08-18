@@ -150,8 +150,10 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       });
 
       // Navigate based on role
-      if (role === 'superadmin' || role === "admin") {
+      if (role === 'superadmin' || role === 'admin' || role === 'manager') {
         navigate('/admin');
+      } else if (role === 'teacher') {
+        navigate('/teacher');
       } else {
         navigate('/dashboard');
       }

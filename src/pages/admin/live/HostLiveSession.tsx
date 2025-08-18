@@ -158,7 +158,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         // Fetch user profiles for the enrolled users
         const { data: users, error: usersError } = await supabase
           .from("users")
-          .select("id, name, email, avatar,location,phone")
+          .select("id, name, email,location,phone")
           .in("id", userIds)
         if (usersError) throw usersError
 
@@ -258,6 +258,8 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         tokenLength: videoToken.length,
         pendingRoomId
       })
+      // When preview token arrives, stop showing "Starting…" on the Start button
+      setJoiningSession(null)
     }
   }, [videoToken, pendingRoomId])
 
@@ -827,8 +829,9 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         title: "Error",
         message: error.message || "Failed to join session.",
       })
-    } finally {
+      // Stop the button spinner on failure
       setJoiningSession(null)
+    } finally {
     }
   }
 
@@ -850,7 +853,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
       const userIds = attendanceData.map((a) => a.user_id)
       const { data: users, error: usersError } = await supabase
         .from("users")
-        .select("id, name, email, avatar")
+        .select("id, name, email")
         .in("id", userIds)
 
       if (usersError) throw usersError
@@ -861,9 +864,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
           ...attendance,
           userName: user?.name || "Unknown User",
           userEmail: user?.email || "N/A",
-          userAvatar:
-            user?.avatar ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.email || "Unknown")}`,
+
         }
       })
       setSessionAttendees(enrichedAttendees)
@@ -1134,14 +1135,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                             {/* Student Info */}
                             <td className="py-4 px-6">
                               <div className="flex items-center gap-3">
-                                <img
-                                  src={
-                                    student.avatar ||
-                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(student.name || student.email)}`
-                                  }
-                                  alt={student.name}
-                                  className="w-10 h-10 rounded-lg object-cover border-2 border-gray-100"
-                                />
+
                                 <div>
                                   <h3 className="font-semibold text-gray-900 text-sm">{student.name || "Anonymous"}</h3>
                                   <p className="text-gray-600 text-xs">{student.email}</p>
@@ -1396,12 +1390,21 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                             <Copy className="w-4 h-4" />
                           </button>
                           <button
-                            className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-1 shadow-sm hover:shadow-md"
+                            className="bg-gradient-to-r from-emerald-500 to-teal-500 disabled:opacity-60 hover:from-emerald-600 hover:to-teal-600 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md"
                             onClick={() => handleJoinSession(session)}
                             disabled={joiningSession === session.id}
                           >
-                            <Play className="w-4 h-4" />
-                            Start
+                            {joiningSession === session.id ? (
+                              <>
+                                <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                                Starting…
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-4 h-4" />
+                                Start
+                              </>
+                            )}
                           </button>
                         </div>
                       </div>
