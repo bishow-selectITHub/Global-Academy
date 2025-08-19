@@ -3,8 +3,8 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Button } from "../../components/ui/Button"
-import { Input } from "../../components/ui/Input"
+import Button from "../../components/ui/Button"
+import Input from "../../components/ui/Input"
 
 export default function Contact() {
     const [formData, setFormData] = useState({
