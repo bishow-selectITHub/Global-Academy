@@ -1,12 +1,9 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode, useMemo } from "react"
-
-type ThemeType = "light" | "dark"
+import { createContext, useContext, type ReactNode } from "react"
 
 interface ThemeContextType {
-  theme: ThemeType
-  setTheme: (theme: ThemeType) => void
+  theme: "light"
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -24,35 +21,9 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider = ({ children }: ThemeProviderProps) => {
-  const [theme, setThemeState] = useState<ThemeType>(() => {
-    // Check if theme is stored in localStorage
-    const savedTheme = localStorage.getItem("gsacademy_theme") as ThemeType | null
-
-    return savedTheme || "light"
-  })
-
-  // Update localStorage and document class when theme changes
-  useEffect(() => {
-    localStorage.setItem("gsacademy_theme", theme)
-
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
-  }, [theme])
-
-  const setTheme = (newTheme: ThemeType) => {
-    setThemeState(newTheme)
+  const value: ThemeContextType = {
+    theme: "light"
   }
-
-  const value = useMemo(
-    () => ({
-      theme,
-      setTheme,
-    }),
-    [theme],
-  )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
