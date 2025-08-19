@@ -148,10 +148,25 @@ const UserManagement = () => {
         throw new Error('You cannot delete your own account.');
       }
 
-      const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: { id: userToDelete.id },
-      });
-      if (error) throw new Error((data as any)?.error || error.message || 'Failed to delete user');
+      // Delete from user_roles table first (due to foreign key constraints)
+      const { error: rolesError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userToDelete.id);
+
+      if (rolesError) {
+        throw new Error(`Failed to delete user roles: ${rolesError.message}`);
+      }
+
+      // Delete from users table
+      const { error: usersError } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userToDelete.id);
+
+      if (usersError) {
+        throw new Error(`Failed to delete user: ${usersError.message}`);
+      }
 
       // Remove user from state
       setUsers(users.filter((u) => u.id !== userToDelete.id));

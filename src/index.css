@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+  font-family: poppins, Arial, Helvetica, sans-serif;
+}
+
 /* TipTap Rich Text Editor Styles */
 .ProseMirror {
   outline: none;
@@ -164,18 +168,26 @@
   color: #374151;
 }
 
-.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
   color: #1e293b;
   margin-top: 2em;
   margin-bottom: 1em;
   line-height: 1.3;
 }
 
-.prose p, .prose ol, .prose ul {
+.prose p,
+.prose ol,
+.prose ul {
   margin-bottom: 1.25em;
 }
 
-.prose ol, .prose ul {
+.prose ol,
+.prose ul {
   padding-left: 1.625em;
 }
 
@@ -195,7 +207,7 @@
   font-style: italic;
   color: #1e293b;
   border-left: 0.25rem solid #e5e7eb;
-  quotes: "\201C""\201D""\2018""\2019";
+  quotes: "\201C" "\201D" "\2018" "\2019";
   margin-top: 1.6em;
   margin-bottom: 1.6em;
   padding-left: 1em;
@@ -206,11 +218,11 @@
   color: #e5e7eb;
 }
 
-.dark .prose h1, 
-.dark .prose h2, 
-.dark .prose h3, 
-.dark .prose h4, 
-.dark .prose h5, 
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose h5,
 .dark .prose h6 {
   color: #f1f5f9;
 }

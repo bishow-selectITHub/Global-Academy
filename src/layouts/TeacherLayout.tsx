@@ -11,6 +11,7 @@ const TeacherLayout = () => {
     const location = useLocation();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const navItems = [
         { path: '/teacher', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
@@ -24,12 +25,21 @@ const TeacherLayout = () => {
         setTheme(theme === 'light' ? 'dark' : 'light');
     };
 
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await logout();
+        } finally {
+            setIsLoggingOut(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
             {/* Top Bar - Mobile Only */}
             <div className="md:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center">
-                    <img src="https://placehold.co/40x40?text=GS" alt="GlobalSelect Academy" className="h-10 w-10 mr-3" />
+                    <img src="https://placehold.co/40x40/2563eb/ffffff?text=GS" alt="GlobalSelect Academy" className="h-10 w-10 mr-3" />
                     <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Teacher Portal</h1>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -55,7 +65,7 @@ const TeacherLayout = () => {
                         <div className="flex-1 overflow-y-auto py-4">
                             <div className="px-4 mb-6">
                                 <div className="flex items-center">
-                                    <img src={user?.avatar || 'https://placehold.co/40x40?text=U'} alt={user?.name} className="h-12 w-12 rounded-full mr-3" />
+                                    <img src={user?.avatar || 'https://placehold.co/40x40/2563eb/ffffff?text=U'} alt={user?.name} className="h-12 w-12 rounded-full mr-3" />
                                     <div>
                                         <p className="font-medium text-slate-800 dark:text-slate-100">{user?.name}</p>
                                         <p className="text-sm text-slate-500 dark:text-slate-400">{user?.email}</p>
@@ -82,13 +92,14 @@ const TeacherLayout = () => {
                                 ))}
                                 <button
                                     onClick={() => {
-                                        logout();
+                                        handleLogout();
                                         setMobileMenuOpen(false);
                                     }}
-                                    className="w-full flex items-center px-4 py-3 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                    disabled={isLoggingOut}
+                                    className="w-full flex items-center px-4 py-3 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <LogOut size={20} className="mr-3" />
-                                    Logout
+                                    {isLoggingOut ? 'Logging out...' : 'Logout'}
                                 </button>
                             </nav>
                         </div>
@@ -104,7 +115,7 @@ const TeacherLayout = () => {
                 >
                     <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                         <div className={`flex items-center ${collapsed ? 'justify-center w-full' : ''}`}>
-                            <img src="https://placehold.co/40x40?text=GS" alt="GlobalSelect Academy" className="h-10 w-10" />
+                            <img src="https://placehold.co/40x40/2563eb/ffffff?text=GS" alt="GlobalSelect Academy" className="h-10 w-10" />
                             {!collapsed && <h1 className="ml-3 text-xl font-semibold text-slate-800 dark:text-slate-100">GS Academy</h1>}
                         </div>
                         <button onClick={() => setCollapsed(!collapsed)} className={`p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 ${collapsed ? 'mx-auto' : ''}`}>
@@ -151,7 +162,7 @@ const TeacherLayout = () => {
                         {collapsed ? (
                             <div className="flex flex-col items-center">
                                 <img src={user?.avatar || 'https://placehold.co/40x40?text=U'} alt={user?.name} className="h-10 w-10 rounded-full mb-2" />
-                                <button onClick={() => logout()} className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md" title="Logout">
+                                <button onClick={handleLogout} disabled={isLoggingOut} className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed" title={isLoggingOut ? "Logging out..." : "Logout"}>
                                     <LogOut size={20} />
                                 </button>
                             </div>
@@ -164,9 +175,9 @@ const TeacherLayout = () => {
                                         <p className="text-xs text-slate-500 dark:text-slate-400">{user?.email}</p>
                                     </div>
                                 </div>
-                                <button onClick={() => logout()} className="w-full flex items-center px-3 py-2 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                <button onClick={handleLogout} disabled={isLoggingOut} className="w-full flex items-center px-3 py-2 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed">
                                     <LogOut size={18} className="mr-2" />
-                                    Logout
+                                    {isLoggingOut ? 'Logging out...' : 'Logout'}
                                 </button>
                             </div>
                         )}

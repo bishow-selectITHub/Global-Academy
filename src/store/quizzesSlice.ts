@@ -190,6 +190,12 @@ const quizzesSlice = createSlice({
             .addCase(deleteQuiz.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
+            })
+            .addCase('ROOT_LOGOUT', (state) => {
+                state.data = [];
+                state.currentQuiz = null;
+                state.loading = false;
+                state.error = null;
             });
     },
 });

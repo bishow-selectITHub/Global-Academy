@@ -19,6 +19,8 @@ interface EnrollmentsState {
     loaded: boolean;
     loadedForUserId: string | null;
     lastFetchedAt?: number;
+    cacheExpiry: number; // 3 minutes for enrollments
+    byCourseId: Record<string, Enrollment[]>; // Indexed by course ID
 }
 
 export const fetchEnrollments = createAsyncThunk<
@@ -27,10 +29,19 @@ export const fetchEnrollments = createAsyncThunk<
     { state: RootState; rejectValue: string }
 >(
     'enrollments/fetchEnrollments',
-    async (userId: string, { rejectWithValue }) => {
+    async (userId: string, { rejectWithValue, getState }) => {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
             return rejectWithValue('You are offline');
         }
+
+        const state = getState();
+        const { loaded, loadedForUserId, loading, lastFetchedAt, cacheExpiry } = state.enrollments as EnrollmentsState;
+
+        // Check if cache is still valid (3 minutes)
+        if (loaded && loadedForUserId === userId && lastFetchedAt && Date.now() - lastFetchedAt < cacheExpiry) {
+            return null; // Cache hit
+        }
+
         const { data, error } = await supabase
             .from('course_enrollments')
             .select('*, course:courses(*)') // join the courses table
@@ -41,10 +52,57 @@ export const fetchEnrollments = createAsyncThunk<
     {
         condition: (userId, { getState }) => {
             const state = getState();
-            const { loaded, loadedForUserId, loading } = state.enrollments as EnrollmentsState;
+            const { loaded, loadedForUserId, loading, lastFetchedAt, cacheExpiry } = state.enrollments as EnrollmentsState;
+
             if (loading) return false;
-            // Skip if we already loaded for this user
-            if (loaded && loadedForUserId === userId) return false;
+
+            // Skip if cache is still valid
+            if (loaded && loadedForUserId === userId && lastFetchedAt && Date.now() - lastFetchedAt < cacheExpiry) {
+                return false;
+            }
+
+            return true;
+        },
+    }
+);
+
+// New action for fetching enrollments by course ID (for course dashboards)
+export const fetchEnrollmentsByCourse = createAsyncThunk<
+    { courseId: string; enrollments: Enrollment[] },
+    string,
+    { state: RootState; rejectValue: string }
+>(
+    'enrollments/fetchByCourse',
+    async (courseId: string, { rejectWithValue, getState }) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return rejectWithValue('You are offline');
+        }
+
+        const state = getState();
+        const { byCourseId, lastFetchedAt, cacheExpiry } = state.enrollments as EnrollmentsState;
+
+        // Check if cache is still valid
+        if (byCourseId[courseId] && lastFetchedAt && Date.now() - lastFetchedAt < cacheExpiry) {
+            return null; // Cache hit
+        }
+
+        const { data, error } = await supabase
+            .from('course_enrollments')
+            .select('*, user:users(id, name, email, avatar)')
+            .eq('course_id', courseId);
+        if (error) return rejectWithValue(error.message);
+        return { courseId, enrollments: (data || []) as Enrollment[] };
+    },
+    {
+        condition: (courseId, { getState }) => {
+            const state = getState();
+            const { byCourseId, lastFetchedAt, cacheExpiry } = state.enrollments as EnrollmentsState;
+
+            // Skip if cache is still valid
+            if (byCourseId[courseId] && lastFetchedAt && Date.now() - lastFetchedAt < cacheExpiry) {
+                return false;
+            }
+
             return true;
         },
     }
@@ -58,6 +116,8 @@ const enrollmentsSlice = createSlice({
         error: null as string | null,
         loaded: false,
         loadedForUserId: null,
+        cacheExpiry: 3 * 60 * 1000, // 3 minutes in milliseconds
+        byCourseId: {},
     } as EnrollmentsState,
     reducers: {
         invalidateEnrollmentsForUser: (state, action) => {
@@ -88,9 +148,42 @@ const enrollmentsSlice = createSlice({
             .addCase(fetchEnrollments.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
+            })
+            // Fetch enrollments by course
+            .addCase(fetchEnrollmentsByCourse.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(fetchEnrollmentsByCourse.fulfilled, (state, action) => {
+                state.loading = false;
+
+                // If action.payload is null, it's a cache hit
+                if (action.payload === null) {
+                    return;
+                }
+
+                const { courseId, enrollments } = action.payload;
+                state.byCourseId[courseId] = enrollments;
+                state.lastFetchedAt = Date.now();
+            })
+            .addCase(fetchEnrollmentsByCourse.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload as string;
+            })
+            .addCase('ROOT_LOGOUT', (state) => {
+                state.data = [];
+                state.loading = false;
+                state.error = null;
+                state.loaded = false;
+                state.loadedForUserId = null;
+                state.lastFetchedAt = undefined;
+                state.byCourseId = {};
             });
     },
 });
 
-export const { invalidateEnrollmentsForUser, clearEnrollments } = enrollmentsSlice.actions;
+export const {
+    invalidateEnrollmentsForUser,
+    clearEnrollments
+} = enrollmentsSlice.actions;
 export default enrollmentsSlice.reducer;

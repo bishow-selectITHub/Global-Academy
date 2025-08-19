@@ -28,6 +28,7 @@ const LearnerLayout = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
@@ -47,6 +48,15 @@ const LearnerLayout = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
       {/* Top Bar */}
@@ -56,7 +66,7 @@ const LearnerLayout = () => {
             <div className="flex items-center">
               <Link to="/dashboard" className="flex items-center">
                 <img
-                  src="https://placehold.co/40x40?text=GS"
+                  src="https://placehold.co/40x40/2563eb/ffffff?text=GS"
                   alt="GlobalSelect Academy"
                   className="h-10 w-10 mr-3"
                 />
@@ -84,16 +94,17 @@ const LearnerLayout = () => {
                 <div className="flex items-center">
                   <button className="flex items-center">
                     <img
-                      src={user?.avatar || "https://placehold.co/40x40?text=U"}
+                      src={user?.avatar || "https://placehold.co/40x40/2563eb/ffffff?text=U"}
                       alt={user?.name}
                       className="h-8 w-8 rounded-full mr-2"
                     />
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mr-1">{user?.name}</span>
                   </button>
                   <button
-                    onClick={() => logout()}
-                    className="ml-4 p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
-                    title="Logout"
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="ml-4 p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={isLoggingOut ? "Logging out..." : "Logout"}
                   >
                     <LogOut size={18} />
                   </button>
@@ -143,11 +154,12 @@ const LearnerLayout = () => {
               </Link>
             ))}
             <button
-              onClick={() => logout()}
-              className="w-full flex items-center px-3 py-2 rounded-md text-base font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="w-full flex items-center px-3 py-2 rounded-md text-base font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <LogOut size={20} className="mr-3" />
-              Logout
+              {isLoggingOut ? 'Logging out...' : 'Logout'}
             </button>
           </div>
         </div>
@@ -196,14 +208,15 @@ const LearnerLayout = () => {
             {sidebarCollapsed ? (
               <div className="flex flex-col items-center">
                 <img
-                  src={user?.avatar || "https://placehold.co/40x40?text=U"}
+                  src={user?.avatar || "https://placehold.co/40x40/2563eb/ffffff?text=U"}
                   alt={user?.name}
                   className="h-10 w-10 rounded-full mb-2"
                 />
                 <button
-                  onClick={() => logout()}
-                  className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
-                  title="Logout"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={isLoggingOut ? "Logging out..." : "Logout"}
                 >
                   <LogOut size={20} />
                 </button>
@@ -212,7 +225,7 @@ const LearnerLayout = () => {
               <div>
                 <div className="flex items-center mb-4">
                   <img
-                    src={user?.avatar || "https://placehold.co/40x40?text=U"}
+                    src={user?.avatar || "https://placehold.co/40x40/2563eb/ffffff?text=U"}
                     alt={user?.name}
                     className="h-10 w-10 rounded-full mr-3"
                   />
@@ -222,11 +235,12 @@ const LearnerLayout = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => logout()}
-                  className="w-full flex items-center px-3 py-2 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="w-full flex items-center px-3 py-2 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <LogOut size={18} className="mr-2" />
-                  Logout
+                  {isLoggingOut ? 'Logging out...' : 'Logout'}
                 </button>
               </div>
             )}

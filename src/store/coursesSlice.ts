@@ -28,6 +28,8 @@ interface CourseState {
     error: string | null;
     loaded: boolean;
     lastFetchedAt?: number;
+    cacheExpiry: number; // Cache expires after 5 minutes
+    byId: Record<string, Course>; // Indexed by ID for faster lookups
 }
 
 export const fetchCourses = createAsyncThunk<
@@ -36,10 +38,19 @@ export const fetchCourses = createAsyncThunk<
     { state: RootState; rejectValue: string }
 >(
     'courses/fetchCourses',
-    async (_, { rejectWithValue }) => {
+    async (_, { rejectWithValue, getState }) => {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
             return rejectWithValue('You are offline');
         }
+
+        const state = getState();
+        const { lastFetchedAt, cacheExpiry } = state.courses;
+
+        // Check if cache is still valid (5 minutes)
+        if (lastFetchedAt && Date.now() - lastFetchedAt < cacheExpiry) {
+            return null; // Return null to indicate cache hit
+        }
+
         const { data, error } = await supabase.from('courses').select('*,enrollments:course_enrollments(count)');
         if (error) return rejectWithValue(error.message);
         return (data || []) as Course[];
@@ -47,9 +58,16 @@ export const fetchCourses = createAsyncThunk<
     {
         condition: (_, { getState }) => {
             const state = getState();
-            const { loaded, loading } = state.courses;
-            // Skip if already loaded or currently loading
-            if (loaded || loading) return false;
+            const { loaded, loading, lastFetchedAt, cacheExpiry } = state.courses;
+
+            // Skip if currently loading
+            if (loading) return false;
+
+            // Skip if cache is still valid
+            if (lastFetchedAt && Date.now() - lastFetchedAt < cacheExpiry) {
+                return false;
+            }
+
             return true;
         },
     }
@@ -127,6 +145,8 @@ const coursesSlice = createSlice({
         loading: false,
         error: null as string | null,
         loaded: false,
+        cacheExpiry: 5 * 60 * 1000, // 5 minutes in milliseconds
+        byId: {},
     } as CourseState,
     reducers: {
         clearCurrentCourse: (state) => {
@@ -137,6 +157,19 @@ const coursesSlice = createSlice({
         },
         invalidateCourses: (state) => {
             state.loaded = false;
+            state.lastFetchedAt = undefined;
+        },
+        getCourseById: (state, action) => {
+            const courseId = action.payload;
+            state.currentCourse = state.byId[courseId] || null;
+        },
+        updateCourseOptimistically: (state, action) => {
+            const updatedCourse = action.payload;
+            const index = state.data.findIndex(course => course.id === updatedCourse.id);
+            if (index !== -1) {
+                state.data[index] = updatedCourse;
+                state.byId[updatedCourse.id] = updatedCourse;
+            }
         },
     },
     extraReducers: (builder) => {
@@ -148,9 +181,21 @@ const coursesSlice = createSlice({
             })
             .addCase(fetchCourses.fulfilled, (state, action) => {
                 state.loading = false;
+
+                // If action.payload is null, it's a cache hit
+                if (action.payload === null) {
+                    return; // Keep existing data
+                }
+
                 state.data = action.payload;
                 state.loaded = true;
                 state.lastFetchedAt = Date.now();
+
+                // Build byId index for faster lookups
+                state.byId = action.payload.reduce((acc, course) => {
+                    acc[course.id] = course;
+                    return acc;
+                }, {} as Record<string, Course>);
             })
             .addCase(fetchCourses.rejected, (state, action) => {
                 state.loading = false;
@@ -216,9 +261,23 @@ const coursesSlice = createSlice({
             .addCase(deleteCourse.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
+            })
+            .addCase('ROOT_LOGOUT', (state) => {
+                state.data = [];
+                state.currentCourse = null;
+                state.loading = false;
+                state.error = null;
+                state.loaded = false;
+                state.lastFetchedAt = undefined;
             });
     },
 });
 
-export const { clearCurrentCourse, clearError } = coursesSlice.actions;
+export const {
+    clearCurrentCourse,
+    clearError,
+    invalidateCourses,
+    getCourseById,
+    updateCourseOptimistically
+} = coursesSlice.actions;
 export default coursesSlice.reducer;

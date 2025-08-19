@@ -33,6 +33,19 @@ export const fetchCurrentUser = createAsyncThunk(
     }
 );
 
+export const logoutUser = createAsyncThunk(
+    'user/logoutUser',
+    async (_, { rejectWithValue }) => {
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) return rejectWithValue(error.message);
+            return true;
+        } catch (error) {
+            return rejectWithValue('Logout failed');
+        }
+    }
+);
+
 const userSlice = createSlice({
     name: 'user',
     initialState: {
@@ -40,7 +53,13 @@ const userSlice = createSlice({
         loading: false,
         error: null as string | null,
     },
-    reducers: {},
+    reducers: {
+        clearUser: (state) => {
+            state.data = null;
+            state.loading = false;
+            state.error = null;
+        },
+    },
     extraReducers: (builder) => {
         builder
             .addCase(fetchCurrentUser.pending, (state) => {
@@ -54,8 +73,26 @@ const userSlice = createSlice({
             .addCase(fetchCurrentUser.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
+            })
+            .addCase(logoutUser.pending, (state) => {
+                // Don't set loading to true for logout - keep it fast
+                state.error = null;
+            })
+            .addCase(logoutUser.fulfilled, (state) => {
+                state.data = null;
+                state.loading = false;
+                state.error = null;
+            })
+            .addCase(logoutUser.rejected, (state, action) => {
+                state.error = action.payload as string;
+            })
+            .addCase('ROOT_LOGOUT', (state) => {
+                state.data = null;
+                state.loading = false;
+                state.error = null;
             });
     },
 });
 
+export const { clearUser } = userSlice.actions;
 export default userSlice.reducer;

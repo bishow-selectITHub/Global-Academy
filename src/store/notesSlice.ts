@@ -97,6 +97,9 @@ const notesSlice = createSlice({
                 const bucket = getBucket(state, courseId);
                 bucket.loading = false;
                 bucket.error = (action.payload as string) || 'Failed to load notes';
+            })
+            .addCase('ROOT_LOGOUT', (state) => {
+                state.byCourseId = {};
             });
     },
 });

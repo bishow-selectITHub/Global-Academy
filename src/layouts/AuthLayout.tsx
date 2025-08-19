@@ -20,7 +20,7 @@ const AuthLayout = () => {
           <div className="max-w-md mx-auto">
             <div className="flex items-center mb-8">
               <img
-                src="https://placehold.co/60x60?text=GS"
+                src="https://placehold.co/60x60/2563eb/ffffff?text=GS"
                 alt="GlobalSelect Academy"
                 className="h-14 w-14 mr-4"
               />

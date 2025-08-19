@@ -34,6 +34,11 @@ const usersSlice = createSlice({
             .addCase(fetchUsers.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
+            })
+            .addCase('ROOT_LOGOUT', (state) => {
+                state.data = [];
+                state.loading = false;
+                state.error = null;
             });
     },
 });

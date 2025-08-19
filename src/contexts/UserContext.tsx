@@ -2,6 +2,8 @@ import { useState, useEffect, createContext, useContext, ReactNode, useMemo, use
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/Toaster';
+import { useDispatch } from 'react-redux';
+import { rootLogout } from '../store/index';
 
 export type UserRole = 'superadmin' | 'learner' | 'admin' | 'manager' | 'teacher';
 
@@ -55,6 +57,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const dispatch = useDispatch();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -167,9 +170,17 @@ export const UserProvider = ({ children }: UserProviderProps) => {
 
   const logout = useCallback(async () => {
     try {
-      setIsLoading(true);
+      // Optimistic logout - clear user state immediately
+      setUser(null);
+      dispatch(rootLogout()); // Clear all Redux state
+
+      // Navigate immediately for better UX
+      navigate('/login');
+
+      // Sign out from Supabase in background
       const { error } = await supabase.auth.signOut();
       if (error) {
+        console.error('Sign out error:', error);
         addToast({
           title: "Error signing out",
           message: error.message,
@@ -180,18 +191,18 @@ export const UserProvider = ({ children }: UserProviderProps) => {
 
       addToast({
         title: "Signed out successfully",
-        message: 'success',
+        message: 'You have been logged out',
         type: 'success'
       });
-
-      setUser(null);
-      navigate('/login');
     } catch (error) {
       console.error('Sign out error:', error);
-    } finally {
-      setIsLoading(false);
+      addToast({
+        title: "Logout error",
+        message: "An error occurred during logout",
+        type: "error"
+      });
     }
-  }, [addToast, navigate]);
+  }, [addToast, navigate, dispatch]);
 
   const register = useCallback(async (
     name: string,
