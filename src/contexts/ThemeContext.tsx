@@ -1,60 +1,58 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+"use client"
 
-type ThemeType = 'light' | 'dark';
+import { createContext, useContext, useState, useEffect, type ReactNode, useMemo } from "react"
+
+type ThemeType = "light" | "dark"
 
 interface ThemeContextType {
-  theme: ThemeType;
-  setTheme: (theme: ThemeType) => void;
+  theme: ThemeType
+  setTheme: (theme: ThemeType) => void
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export const useTheme = () => {
-  const context = useContext(ThemeContext);
+  const context = useContext(ThemeContext)
   if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    throw new Error("useTheme must be used within a ThemeProvider")
   }
-  return context;
-};
+  return context
+}
 
 interface ThemeProviderProps {
-  children: ReactNode;
+  children: ReactNode
 }
 
 export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   const [theme, setThemeState] = useState<ThemeType>(() => {
     // Check if theme is stored in localStorage
-    const savedTheme = localStorage.getItem('gsacademy_theme') as ThemeType | null;
+    const savedTheme = localStorage.getItem("gsacademy_theme") as ThemeType | null
 
-    // Check if user prefers dark mode
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-    return savedTheme || (prefersDark ? 'dark' : 'light');
-  });
+    return savedTheme || "light"
+  })
 
   // Update localStorage and document class when theme changes
   useEffect(() => {
-    localStorage.setItem('gsacademy_theme', theme);
+    localStorage.setItem("gsacademy_theme", theme)
 
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark")
     } else {
-      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove("dark")
     }
-  }, [theme]);
+  }, [theme])
 
   const setTheme = (newTheme: ThemeType) => {
-    setThemeState(newTheme);
-  };
+    setThemeState(newTheme)
+  }
 
-  const value = useMemo(() => ({
-    theme,
-    setTheme
-  }), [theme]);
+  const value = useMemo(
+    () => ({
+      theme,
+      setTheme,
+    }),
+    [theme],
+  )
 
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
-  );
-};
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+}
