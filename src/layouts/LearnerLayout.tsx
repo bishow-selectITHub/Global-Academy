@@ -65,13 +65,7 @@ const LearnerLayout = () => {
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link
-                to="/"
-                className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 mr-2"
-                title="Home"
-              >
-                <Home size={20} className="text-slate-600 dark:text-slate-300" />
-              </Link>
+
               <Link to="/dashboard" className="flex items-center">
                 <img
                   src="https://placehold.co/40x40/2563eb/ffffff?text=GS"
@@ -181,13 +175,7 @@ const LearnerLayout = () => {
         >
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div className={`flex  items-center ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
-              <Link
-                to="/"
-                className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 mr-2"
-                title="Home"
-              >
-                <Home size={20} className="text-slate-600 dark:text-slate-300" />
-              </Link>
+
               {!sidebarCollapsed && (
                 <h2 className="text-lg  font-semibold text-slate-800 dark:text-slate-100">Navigation</h2>
               )}
