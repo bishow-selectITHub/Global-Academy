@@ -64,71 +64,71 @@ export default function Testimonials() {
     ]
 
     return (
-        <div className="bg-gradient-to-br from-white via-blue-50/20 to-slate-50 py-32">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        <div className="bg-gradient-to-br from-white via-blue-50/20 to-slate-50 py-16 sm:py-20 lg:py-32">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
-                <div className="text-center mb-24">
-                    <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-100 to-blue-100 text-green-700 rounded-full text-sm font-semibold mb-8 shadow-sm">
-                        <span className="text-lg mr-2">💬</span>
+                <div className="text-center mb-16 sm:mb-20 lg:mb-24">
+                    <div className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-green-100 to-blue-100 text-green-700 rounded-full text-xs sm:text-sm font-semibold mb-6 sm:mb-8 shadow-sm">
+                        <span className="text-base sm:text-lg mr-2">💬</span>
                         Trusted Worldwide
                     </div>
-                    <h1 className="text-6xl md:text-7xl font-bold text-gray-900 mb-8 leading-tight">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 mb-6 sm:mb-8 leading-tight">
                         Loved by{" "}
                         <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Learners</span>
                         <br />
                         Worldwide
                     </h1>
-                    <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
                         See what our community of learners, educators, and organizations have to say about their Global Academy
                         experience
                     </p>
                 </div>
 
                 {/* Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-24">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-16 sm:mb-20 lg:mb-24">
                     {stats.map((stat, index) => (
                         <div key={index} className="text-center group">
-                            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100">
-                                <div className="text-3xl mb-4 group-hover:scale-110 transition-transform">{stat.icon}</div>
-                                <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100">
+                                <div className="text-2xl sm:text-3xl mb-3 sm:mb-4 group-hover:scale-110 transition-transform">{stat.icon}</div>
+                                <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
                                     {stat.number}
                                 </div>
-                                <div className="text-gray-600 font-medium">{stat.label}</div>
+                                <div className="text-gray-600 font-medium text-xs sm:text-sm">{stat.label}</div>
                             </div>
                         </div>
                     ))}
                 </div>
 
                 {/* Testimonials Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-24">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-20 lg:mb-24">
                     {testimonials.map((testimonial, index) => (
                         <div
                             key={index}
-                            className="group bg-white/90 backdrop-blur-sm border border-gray-200/50 rounded-3xl p-8 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 hover:-translate-y-2"
+                            className="group bg-white/90 backdrop-blur-sm border border-gray-200/50 rounded-3xl p-6 sm:p-8 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 hover:-translate-y-2"
                         >
                             {/* Rating */}
-                            <div className="flex items-center mb-6">
+                            <div className="flex items-center mb-4 sm:mb-6">
                                 {[...Array(testimonial.rating)].map((_, i) => (
-                                    <svg key={i} className="w-5 h-5 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                                    <svg key={i} className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 fill-current" viewBox="0 0 20 20">
                                         <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
                                     </svg>
                                 ))}
                             </div>
 
                             {/* Content */}
-                            <p className="text-gray-700 mb-8 leading-relaxed text-lg italic">"{testimonial.content}"</p>
+                            <p className="text-gray-700 mb-6 sm:mb-8 leading-relaxed text-sm sm:text-base lg:text-lg italic">"{testimonial.content}"</p>
 
                             {/* Author */}
                             <div className="flex items-center">
                                 <img
                                     src={testimonial.image || "/placeholder.svg"}
                                     alt={testimonial.name}
-                                    className="w-14 h-14 rounded-full mr-4 ring-4 ring-blue-100 group-hover:ring-blue-200 transition-all"
+                                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-full mr-3 sm:mr-4 ring-4 ring-blue-100 group-hover:ring-blue-200 transition-all"
                                 />
                                 <div>
-                                    <div className="font-bold text-gray-900 text-lg">{testimonial.name}</div>
-                                    <div className="text-sm text-blue-600 font-medium">{testimonial.role}</div>
-                                    <div className="text-sm text-gray-500">{testimonial.company}</div>
+                                    <div className="font-bold text-gray-900 text-base sm:text-lg">{testimonial.name}</div>
+                                    <div className="text-xs sm:text-sm text-blue-600 font-medium">{testimonial.role}</div>
+                                    <div className="text-xs sm:text-sm text-gray-500">{testimonial.company}</div>
                                 </div>
                             </div>
                         </div>
@@ -137,21 +137,21 @@ export default function Testimonials() {
 
                 {/* CTA Section */}
                 <div className="text-center">
-                    <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-blue-700 rounded-3xl p-16 text-white shadow-2xl">
-                        <h2 className="text-5xl font-bold mb-8">Join Our Success Stories</h2>
-                        <p className="text-xl text-blue-100 mb-12 max-w-3xl mx-auto leading-relaxed">
+                    <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-blue-700 rounded-3xl p-8 sm:p-12 lg:p-16 text-white shadow-2xl">
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 sm:mb-8">Join Our Success Stories</h2>
+                        <p className="text-base sm:text-lg lg:text-xl text-blue-100 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed">
                             Start your learning journey today and become part of our growing community of successful learners
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-6 justify-center">
+                        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
                             <a
                                 href="/register"
-                                className="bg-white text-blue-700 hover:bg-blue-50 px-10 py-4 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+                                className="bg-white text-blue-700 hover:bg-blue-50 px-6 sm:px-8 lg:px-10 py-3 sm:py-4 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 w-full sm:w-auto"
                             >
                                 Start Learning Now
                             </a>
                             <a
                                 href="/features"
-                                className="border-2 border-white/30 text-white hover:bg-white/10 px-10 py-4 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm"
+                                className="border-2 border-white/30 text-white hover:bg-white/10 px-6 sm:px-8 lg:px-10 py-3 sm:py-4 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm w-full sm:w-auto"
                             >
                                 Explore Features
                             </a>

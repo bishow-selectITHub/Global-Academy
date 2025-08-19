@@ -4,41 +4,41 @@ export default function Features() {
             title: "Course Management",
             description:
                 "Create, organize, and deliver comprehensive courses with multimedia content, structured lessons, and progress tracking.",
-            icon: "https://cdn-icons-png.flaticon.com/512/3002/3002543.png",
+            icon: "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=100&h=100&fit=crop&crop=center",
             benefits: ["Multimedia lessons", "Progress tracking", "Structured curriculum", "Assessment tools"],
         },
         {
             title: "Live Interactive Sessions",
             description:
                 "Host real-time classes with video conferencing, screen sharing, and collaborative tools for engaging learning experiences.",
-            icon: "https://cdn-icons-png.flaticon.com/512/2991/2991148.png",
+            icon: "https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?w=100&h=100&fit=crop&crop=center",
             benefits: ["HD video conferencing", "Screen sharing", "Interactive whiteboard", "Recording capabilities"],
         },
         {
             title: "Quiz & Assessment System",
             description:
                 "Build comprehensive quizzes and assessments with various question types, automatic grading, and detailed feedback.",
-            icon: "https://cdn-icons-png.flaticon.com/512/3281/3281289.png",
+            icon: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=100&h=100&fit=crop&crop=center",
             benefits: ["Multiple question types", "Auto-grading", "Instant feedback", "Performance analytics"],
         },
         {
             title: "Certificate Management",
             description:
                 "Generate and manage digital certificates for course completion with customizable templates and verification.",
-            icon: "https://cdn-icons-png.flaticon.com/512/2910/2910791.png",
+            icon: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=center",
             benefits: ["Custom templates", "Digital verification", "Automated generation", "Professional design"],
         },
         {
             title: "User Role Management",
             description:
                 "Comprehensive role-based access control for administrators, teachers, and learners with appropriate permissions.",
-            icon: "https://cdn-icons-png.flaticon.com/512/1077/1077114.png",
+            icon: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop&crop=center",
             benefits: ["Role-based access", "Permission control", "User profiles", "Activity monitoring"],
         },
         {
             title: "Multi-Tenant Architecture",
             description: "Scalable platform supporting multiple organizations with isolated data and customizable branding.",
-            icon: "https://cdn-icons-png.flaticon.com/512/2920/2920277.png",
+            icon: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=100&h=100&fit=crop&crop=center",
             benefits: ["Data isolation", "Custom branding", "Scalable infrastructure", "Organization management"],
         },
     ]
@@ -75,7 +75,7 @@ export default function Features() {
                                 <img
                                     src={feature.icon || "/placeholder.svg"}
                                     alt={feature.title}
-                                    className="w-12 h-12 object-contain"
+                                    className="w-12 h-12 object-cover rounded-lg"
                                 />
                             </div>
 
@@ -101,50 +101,50 @@ export default function Features() {
                     {/* Live Sessions Detail */}
                     <div className="grid lg:grid-cols-2 gap-12 items-center">
                         <div>
-                            <h2 className="text-4xl font-bold text-foreground mb-6">
-                                Interactive <span className="text-primary">Live Sessions</span>
+                            <h2 className="text-4xl font-bold text-gray-900 mb-6">
+                                Interactive <span className="text-[#2369f4]">Live Sessions</span>
                             </h2>
-                            <p className="text-xl text-muted-foreground mb-8">
+                            <p className="text-xl text-gray-600 mb-8">
                                 Transform traditional learning with real-time interactive sessions that engage students like never
                                 before.
                             </p>
                             <div className="space-y-4">
                                 <div className="flex items-start gap-4">
-                                    <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center mt-1">
-                                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                                    <div className="w-6 h-6 bg-[#2369f4]/10 rounded-full flex items-center justify-center mt-1">
+                                        <div className="w-2 h-2 bg-[#2369f4] rounded-full"></div>
                                     </div>
                                     <div>
-                                        <h4 className="font-semibold text-card-foreground">HD Video & Audio</h4>
-                                        <p className="text-muted-foreground">Crystal clear communication with adaptive quality</p>
+                                        <h4 className="font-semibold text-gray-900">HD Video & Audio</h4>
+                                        <p className="text-gray-600">Crystal clear communication with adaptive quality</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-4">
-                                    <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center mt-1">
-                                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                                    <div className="w-6 h-6 bg-[#2369f4]/10 rounded-full flex items-center justify-center mt-1">
+                                        <div className="w-2 h-2 bg-[#2369f4] rounded-full"></div>
                                     </div>
                                     <div>
-                                        <h4 className="font-semibold text-card-foreground">Interactive Whiteboard</h4>
-                                        <p className="text-muted-foreground">Collaborative drawing and annotation tools</p>
+                                        <h4 className="font-semibold text-gray-900">Interactive Whiteboard</h4>
+                                        <p className="text-gray-600">Collaborative drawing and annotation tools</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-4">
-                                    <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center mt-1">
-                                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                                    <div className="w-6 h-6 bg-[#2369f4]/10 rounded-full flex items-center justify-center mt-1">
+                                        <div className="w-2 h-2 bg-[#2369f4] rounded-full"></div>
                                     </div>
                                     <div>
-                                        <h4 className="font-semibold text-card-foreground">Session Recording</h4>
-                                        <p className="text-muted-foreground">Automatic recording for later review</p>
+                                        <h4 className="font-semibold text-gray-900">Session Recording</h4>
+                                        <p className="text-gray-600">Automatic recording for later review</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div className="relative">
                             <img
-                                src="/online-classroom-video-conference.png"
+                                src="https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?w=600&h=400&fit=crop&crop=center"
                                 alt="Live Sessions"
-                                className="rounded-2xl shadow-2xl"
+                                className="rounded-2xl shadow-2xl w-full"
                             />
-                            <div className="absolute -top-4 -right-4 bg-accent text-accent-foreground px-4 py-2 rounded-lg shadow-lg">
+                            <div className="absolute -top-4 -right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg">
                                 Live Now: 150 Students
                             </div>
                         </div>
@@ -153,35 +153,39 @@ export default function Features() {
                     {/* Assessment Detail */}
                     <div className="grid lg:grid-cols-2 gap-12 items-center">
                         <div className="lg:order-2">
-                            <h2 className="text-4xl font-bold text-foreground mb-6">
-                                Smart <span className="text-accent">Assessments</span>
+                            <h2 className="text-4xl font-bold text-gray-900 mb-6">
+                                Smart <span className="text-[#2369f4]">Assessments</span>
                             </h2>
-                            <p className="text-xl text-muted-foreground mb-8">
+                            <p className="text-xl text-gray-600 mb-8">
                                 Create engaging quizzes and tests that adapt to student performance and provide instant, meaningful
                                 feedback.
                             </p>
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="text-center">
-                                    <div className="text-3xl font-bold text-primary mb-2">15+</div>
-                                    <div className="text-muted-foreground">Question Types</div>
+                                    <div className="text-3xl font-bold text-[#2369f4] mb-2">15+</div>
+                                    <div className="text-gray-600">Question Types</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-3xl font-bold text-primary mb-2">Auto</div>
-                                    <div className="text-muted-foreground">Grading</div>
+                                    <div className="text-3xl font-bold text-[#2369f4] mb-2">Auto</div>
+                                    <div className="text-gray-600">Grading</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-3xl font-bold text-primary mb-2">Real-time</div>
-                                    <div className="text-muted-foreground">Feedback</div>
+                                    <div className="text-3xl font-bold text-[#2369f4] mb-2">Real-time</div>
+                                    <div className="text-gray-600">Feedback</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-3xl font-bold text-primary mb-2">Advanced</div>
-                                    <div className="text-muted-foreground">Analytics</div>
+                                    <div className="text-3xl font-bold text-[#2369f4] mb-2">Advanced</div>
+                                    <div className="text-gray-600">Analytics</div>
                                 </div>
                             </div>
                         </div>
                         <div className="lg:order-1 relative">
-                            <img src="/quiz-assessment-interface.png" alt="Smart Assessments" className="rounded-2xl shadow-2xl" />
-                            <div className="absolute -bottom-4 -left-4 bg-secondary text-secondary-foreground px-4 py-2 rounded-lg shadow-lg">
+                            <img
+                                src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=600&h=400&fit=crop&crop=center"
+                                alt="Smart Assessments"
+                                className="rounded-2xl shadow-2xl w-full"
+                            />
+                            <div className="absolute -bottom-4 -left-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg">
                                 98% Accuracy Rate
                             </div>
                         </div>
