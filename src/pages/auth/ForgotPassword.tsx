@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
+import { Mail, Home } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 
@@ -12,24 +12,24 @@ const ForgotPassword = () => {
 
   const validateForm = () => {
     const newErrors: { email?: string } = {};
-    
+
     if (!email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Email is invalid';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setIsLoading(true);
-    
+
     try {
       // In a real app, this would call a password reset function
       // For the demo, we'll just simulate a successful request
@@ -66,7 +66,14 @@ const ForgotPassword = () => {
 
   return (
     <div>
-      <div className="mb-8 text-center">
+      <div className="mb-8 text-center relative">
+        <Link
+          to="/"
+          className="absolute left-0 top-0 p-2 rounded-md hover:bg-slate-100 transition-colors"
+          title="Home"
+        >
+          <Home size={20} className="text-slate-600 hover:text-slate-800" />
+        </Link>
         <h2 className="text-2xl font-bold text-slate-900">Reset your password</h2>
         <p className="mt-2 text-sm text-slate-600">
           We'll email you a link to reset your password

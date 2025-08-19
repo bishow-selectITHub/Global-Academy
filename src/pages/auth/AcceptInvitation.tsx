@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Home } from 'lucide-react';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { supabase } from '../../lib/supabase';
@@ -188,7 +189,14 @@ const AcceptInvitation = () => {
 
     return (
         <div>
-            <div className="mb-6 text-center">
+            <div className="mb-6 text-center relative">
+                <Link
+                    to="/"
+                    className="absolute left-0 top-0 p-2 rounded-md hover:bg-slate-100 transition-colors"
+                    title="Home"
+                >
+                    <Home size={20} className="text-slate-600 hover:text-slate-800" />
+                </Link>
                 <h2 className="text-2xl font-bold text-slate-900">Accept Invitation</h2>
                 <p className="mt-2 text-sm text-slate-600">Set a password to activate your account.</p>
             </div>

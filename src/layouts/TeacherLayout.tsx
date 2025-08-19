@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ChevronLeft, ChevronRight, LogOut, User, Menu, X, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, ChevronLeft, ChevronRight, LogOut, Menu, X, Moon, Sun, Home } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import GlobalSearch from '../components/global/GlobalSearch';
 import { useTheme } from '../contexts/ThemeContext';
@@ -39,6 +39,13 @@ const TeacherLayout = () => {
             {/* Top Bar - Mobile Only */}
             <div className="md:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center">
+                    <Link
+                        to="/"
+                        className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 mr-2"
+                        title="Home"
+                    >
+                        <Home size={20} className="text-slate-600 dark:text-slate-300" />
+                    </Link>
                     <img src="https://placehold.co/40x40/2563eb/ffffff?text=GS" alt="GlobalSelect Academy" className="h-10 w-10 mr-3" />
                     <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Teacher Portal</h1>
                 </div>
@@ -115,6 +122,13 @@ const TeacherLayout = () => {
                 >
                     <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                         <div className={`flex items-center ${collapsed ? 'justify-center w-full' : ''}`}>
+                            <Link
+                                to="/"
+                                className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 mr-2"
+                                title="Home"
+                            >
+                                <Home size={20} className="text-slate-600 dark:text-slate-300" />
+                            </Link>
                             <img src="https://placehold.co/40x40/2563eb/ffffff?text=GS" alt="GlobalSelect Academy" className="h-10 w-10" />
                             {!collapsed && <h1 className="ml-3 text-xl font-semibold text-slate-800 dark:text-slate-100">GS Academy</h1>}
                         </div>

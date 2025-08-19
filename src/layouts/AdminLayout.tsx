@@ -10,12 +10,12 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  User,
   Menu,
   X,
   Moon,
   Sun,
-  PieChart
+  PieChart,
+  Home
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import GlobalSearch from '../components/global/GlobalSearch';
@@ -61,6 +61,13 @@ const AdminLayout = () => {
       {/* Top Bar - Mobile Only */}
       <div className="md:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center">
+          <Link
+            to="/"
+            className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 mr-2"
+            title="Home"
+          >
+            <Home size={20} className="text-slate-600 dark:text-slate-300" />
+          </Link>
           <img
             src="https://placehold.co/40x40/2563eb/ffffff?text=GS"
             alt="GlobalSelect Academy"
@@ -154,6 +161,13 @@ const AdminLayout = () => {
         >
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div className={`flex items-center ${collapsed ? 'justify-center w-full' : ''}`}>
+              <Link
+                to="/"
+                className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 mr-2"
+                title="Home"
+              >
+                <Home size={20} className="text-slate-600 dark:text-slate-300" />
+              </Link>
               <img
                 src="https://placehold.co/40x40/2563eb/ffffff?text=GS"
                 alt="GlobalSelect Academy"

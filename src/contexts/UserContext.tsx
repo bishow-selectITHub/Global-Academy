@@ -62,20 +62,39 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   useEffect(() => {
     const fetchUser = async () => {
       setIsLoading(true);
+      console.log('🔍 UserContext: Starting user fetch...');
+
+      // 🚨 TEMPORARY: Force clear session for testing
+      const currentPath = window.location.pathname;
+      if (currentPath === '/' || currentPath.startsWith('/features') || currentPath.startsWith('/pricing') ||
+        currentPath.startsWith('/testimonials') || currentPath.startsWith('/about') || currentPath.startsWith('/contact')) {
+        console.log('🧹 On landing page - checking for force session clear...');
+        // Only clear if explicitly requested (you can add a query param like ?clear=true)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('clear') === 'true') {
+          console.log('🧹 Force clearing session...');
+          await supabase.auth.signOut();
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+
       try {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
-          console.error('Error fetching session:', sessionError);
+          console.error('❌ Error fetching session:', sessionError);
           setIsLoading(false);
           return;
         }
 
+        console.log('📊 Session data:', sessionData?.session ? 'Session exists' : 'No session');
+
         if (sessionData?.session) {
+          console.log('🔑 Found existing session, fetching user data...');
           const { data: userData } = await supabase.auth.getUser();
 
           if (userData?.user) {
-            let role: UserRole = 'superadmin'; // Default role
+            let role: UserRole = 'learner'; // Default role
 
             if (userData.user.user_metadata?.role) {
               role = userData.user.user_metadata.role as UserRole;
@@ -96,6 +115,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
               }
             }
 
+            console.log(`👤 Setting user with role: ${role}`);
             setUser({
               id: userData.user.id,
               email: userData.user.email || '',
@@ -104,16 +124,19 @@ export const UserProvider = ({ children }: UserProviderProps) => {
               name: userData.user.user_metadata?.name || ''
             });
           }
+        } else {
+          console.log('🚫 No session found, user will remain null');
         }
       } catch (err) {
-        console.error('Error in fetchUser:', err);
+        console.error('💥 Error in fetchUser:', err);
       } finally {
         setIsLoading(false);
+        console.log('✅ UserContext: User fetch completed');
       }
     };
 
     fetchUser();
-  }, [navigate]);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
