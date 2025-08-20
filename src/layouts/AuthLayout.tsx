@@ -1,6 +1,6 @@
 "use client"
 
-import { Outlet, Navigate, useLocation } from "react-router-dom"
+import { Outlet, Navigate, useLocation, Link } from "react-router-dom"
 import { useUser } from "../contexts/UserContext"
 
 const AuthLayout = () => {
@@ -22,8 +22,8 @@ const AuthLayout = () => {
       </div>
 
       <div className="flex-1 flex flex-col lg:flex-row relative z-10 ">
-        {/* Brand section (left on desktop, top on mobile) */}
-        <div className="pt-20 lg:fixed lg:left-0 lg:top-0 lg:bottom-0 lg:w-1/2 h-screen bg-gradient-to-br from-[#2369f4] via-blue-600 to-indigo-700 text-white p-8 lg:p-12 flex flex-col justify-center relative overflow-hidden ">
+        {/* Brand section (left on desktop, hidden on mobile) */}
+        <div className="hidden lg:flex lg:fixed lg:left-0 lg:top-0 lg:bottom-0 lg:w-1/2 h-screen bg-gradient-to-br from-[#2369f4] via-blue-600 to-indigo-700 text-white p-8 lg:p-12 flex flex-col justify-center relative overflow-hidden">
           <div className="absolute inset-0 opacity-10  ">
             <div
               className="absolute inset-0 "
@@ -106,9 +106,22 @@ const AuthLayout = () => {
         </div>
 
         {/* Auth form section */}
-        <div className="lg:ml-[50%] lg:w-1/2 flex justify-center items-start p-8 lg:p-12 min-h-screen">
+        <div className="w-full lg:ml-[50%] lg:w-1/2 flex justify-center items-start p-8 lg:p-12 min-h-screen">
           <div className="w-full max-w-lg">
             <div className="bg-white bg-opacity-80 backdrop-blur-sm border border-white border-opacity-50 rounded-2xl shadow-2xl p-8 lg:p-10">
+              {/* Back Home button */}
+              <div className="mb-6">
+                <Link
+                  to="/"
+                  className="inline-flex items-center text-sm text-gray-600 hover:text-gray-800 transition-colors duration-200"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back to Home
+                </Link>
+              </div>
+
               <Outlet />
             </div>
           </div>
