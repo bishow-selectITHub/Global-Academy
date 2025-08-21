@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { createPortal } from 'react-dom'
-import { Video, Users, Calendar, Play, Copy, Clock } from "lucide-react"
+import { Video, Users, Calendar, Play, Copy, Clock, BookOpen, Clock as ClockIcon, Star, MapPin } from "lucide-react"
 import type { RootState, AppDispatch } from "../../../store"
 import { fetchCourses } from "../../../store/coursesSlice"
 import { fetchLiveSessions } from "../../../store/liveSessionsSlice"
@@ -283,6 +283,19 @@ const TeacherCourses = () => {
         }
     }
 
+    const getLevelColor = (level: string) => {
+        switch (level) {
+            case "beginner":
+                return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+            case "intermediate":
+                return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+            case "advanced":
+                return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+            default:
+                return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+        }
+    }
+
     if (videoToken) {
         const modalContent = (
             <div className="fixed inset-0 bg-black" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', zIndex: 999999 }}>
@@ -495,116 +508,160 @@ const TeacherCourses = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            <div className="max-w-7xl mx-auto px-6 py-8">
-                <div className="mb-8">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">My Courses & Live Rooms</h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">View your assigned courses and join live sessions</p>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+                <div className="mb-6 sm:mb-8">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">My Courses & Live Rooms</h1>
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">View your assigned courses and join live sessions</p>
                 </div>
 
                 {teacherCourses.length === 0 ? (
-                    <div className="text-center py-12">
-                        <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Courses Assigned</h3>
-                        <p className="text-gray-600 dark:text-gray-400">You don't have any courses assigned to you yet.</p>
+                    <div className="text-center py-8 sm:py-12">
+                        <BookOpen className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Courses Assigned</h3>
+                        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">You don't have any courses assigned to you yet.</p>
                     </div>
                 ) : (
-                    <div className="space-y-8">
+                    <div className="space-y-6 sm:space-y-8">
                         {teacherCourses.map((course) => {
                             const courseRooms = rooms.filter((room) => room.course_id === course.id)
                             const courseEnrollments = enrollmentsByCourse[course.id] || []
                             const enrolledCount = courseEnrollments.length
                             return (
-                                <div key={course.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-                                    {/* Course Header */}
-                                    <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{course.title}</h2>
-                                                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                                                    {course.description || "No description available"}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                                                <div className="flex items-center gap-1">
-                                                    <Video size={16} />
-                                                    <span>{courseRooms.length} rooms</span>
+                                <div key={course.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                                    {/* Course Header with Thumbnail */}
+                                    <div className="relative">
+                                        {/* Course Thumbnail */}
+                                        <div className="h-48 bg-gradient-to-r from-blue-500 to-purple-600 relative overflow-hidden">
+                                            {course.thumbnail ? (
+                                                <img
+                                                    src={course.thumbnail}
+                                                    alt={course.title}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center">
+                                                    <BookOpen className="h-16 w-16 text-white opacity-80" />
                                                 </div>
-                                                <div className="flex items-center gap-1">
-                                                    <Users size={16} />
-                                                    {/* enrollmentsLoading is no longer destructured, so it's not available here */}
-                                                    <span>{enrolledCount} students</span>
+                                            )}
+                                            {/* Overlay with course info */}
+                                            <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
+                                                <div className="p-6 w-full">
+                                                    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                                                        <div className="text-white">
+                                                            <h2 className="text-2xl sm:text-3xl font-bold mb-2">{course.title}</h2>
+                                                            <p className="text-white/90 text-sm sm:text-base mb-3 line-clamp-2">
+                                                                {course.description || "No description available"}
+                                                            </p>
+                                                            <div className="flex flex-wrap items-center gap-3 text-sm">
+                                                                <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                                                                    <ClockIcon size={14} />
+                                                                    <span>{course.duration}</span>
+                                                                </div>
+                                                                <div className={`px-3 py-1 rounded-full text-xs font-medium ${getLevelColor(course.level)}`}>
+                                                                    {course.level}
+                                                                </div>
+                                                                <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                                                                    <MapPin size={14} />
+                                                                    <span>{course.category}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-4 text-white/90">
+                                                            <div className="text-center">
+                                                                <div className="text-2xl font-bold">{courseRooms.length}</div>
+                                                                <div className="text-xs opacity-80">Live Rooms</div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <div className="text-2xl font-bold">{enrolledCount}</div>
+                                                                <div className="text-xs opacity-80">Students</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Live Rooms */}
+                                    {/* Live Rooms Section */}
                                     <div className="p-6">
                                         {courseRooms.length === 0 ? (
                                             <div className="text-center py-8">
                                                 <Video className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                                                <p className="text-gray-600 dark:text-gray-400">No live rooms created for this course yet.</p>
+                                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Live Rooms Yet</h3>
+                                                <p className="text-gray-600 dark:text-gray-400">Create your first live session room to start teaching.</p>
                                             </div>
                                         ) : (
                                             <div className="space-y-4">
-                                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+                                                    <Video className="h-5 w-5 text-blue-600" />
                                                     Live Rooms ({courseRooms.length})
                                                 </h3>
                                                 <div className="grid gap-4">
                                                     {courseRooms.map((room) => (
                                                         <div
                                                             key={room.id}
-                                                            className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                            className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-200"
                                                         >
-                                                            <div className="flex items-center gap-4">
-                                                                <div className={`w-3 h-3 rounded-full ${getStatusColor(room.status)}`}></div>
-                                                                <div>
-                                                                    <h4 className="font-medium text-gray-900 dark:text-gray-100">{room.room_name}</h4>
-                                                                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                                                        <div className="flex items-center gap-1">
-                                                                            <Calendar size={14} />
-                                                                            <span>{new Date(room.start_time).toLocaleString()}</span>
+                                                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                                                <div className="flex items-start gap-4 min-w-0 flex-1">
+                                                                    <div className={`w-3 h-3 rounded-full ${getStatusColor(room.status)} flex-shrink-0 mt-2`}></div>
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-lg mb-2">{room.room_name}</h4>
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-gray-600 dark:text-gray-400">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Calendar size={16} className="text-blue-500" />
+                                                                                <span>{new Date(room.start_time).toLocaleDateString()}</span>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Clock size={16} className="text-green-500" />
+                                                                                <span>{new Date(room.start_time).toLocaleTimeString()}</span>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Users size={16} className="text-purple-500" />
+                                                                                <span>Max {room.max_participants} participants</span>
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="flex items-center gap-1">
-                                                                            <Users size={14} />
-                                                                            <span>Max {room.max_participants} participants</span>
-                                                                        </div>
-                                                                        <div className="flex items-center gap-1">
-                                                                            <Clock size={14} />
-                                                                            <span>{getStatusText(room.status)}</span>
+                                                                        {room.description && (
+                                                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 italic">"{room.description}"</p>
+                                                                        )}
+                                                                        <div className="mt-3">
+                                                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${room.status === 'live' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                                                                                    room.status === 'scheduled' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                                                                                        'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                                                                                }`}>
+                                                                                <div className={`w-2 h-2 rounded-full mr-2 ${getStatusColor(room.status)}`}></div>
+                                                                                {getStatusText(room.status)}
+                                                                            </span>
                                                                         </div>
                                                                     </div>
-                                                                    {room.description && (
-                                                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{room.description}</p>
-                                                                    )}
                                                                 </div>
-                                                            </div>
 
-                                                            <div className="flex items-center gap-2">
-                                                                <button
-                                                                    onClick={() => handleCopyRoomId(room.room_id)}
-                                                                    className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                                                                    title="Copy Room ID"
-                                                                >
-                                                                    <Copy size={16} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleJoinSession(room)}
-                                                                    disabled={joiningSession === room.id}
-                                                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-                                                                >
-                                                                    {joiningSession === room.id ? (
-                                                                        <>
-                                                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                                                            Joining...
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <Play size={16} />
-                                                                            Join Room
-                                                                        </>
-                                                                    )}
-                                                                </button>
+                                                                <div className="flex items-center gap-3 self-end lg:self-auto">
+                                                                    <button
+                                                                        onClick={() => handleCopyRoomId(room.room_id)}
+                                                                        className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-all duration-200"
+                                                                        title="Copy Room ID"
+                                                                    >
+                                                                        <Copy size={18} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleJoinSession(room)}
+                                                                        disabled={joiningSession === room.id}
+                                                                        className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                                                                    >
+                                                                        {joiningSession === room.id ? (
+                                                                            <>
+                                                                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                                                                <span>Joining...</span>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <Play size={18} />
+                                                                                <span>Join Room</span>
+                                                                            </>
+                                                                        )}
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     ))}
