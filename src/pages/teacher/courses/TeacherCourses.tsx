@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { createPortal } from 'react-dom'
-import { Video, Users, Calendar, Play, Copy, Clock, BookOpen, Clock as ClockIcon, Star, MapPin } from "lucide-react"
+import { Video, Users, Calendar, Play, Copy, Clock, BookOpen, Clock as ClockIcon, Star, MapPin, Mic, MicOff, Users2, Clock3 } from "lucide-react"
 import type { RootState, AppDispatch } from "../../../store"
 import { fetchCourses } from "../../../store/coursesSlice"
 import { fetchLiveSessions } from "../../../store/liveSessionsSlice"
@@ -499,8 +499,8 @@ const TeacherCourses = () => {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-gray-600 dark:text-gray-400 mt-4">Loading courses and rooms...</p>
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-gray-600 dark:text-gray-400 mt-3 text-sm">Loading courses and rooms...</p>
                 </div>
             </div>
         )
@@ -508,73 +508,76 @@ const TeacherCourses = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
-                <div className="mb-6 sm:mb-8">
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">My Courses & Live Rooms</h1>
-                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">View your assigned courses and join live sessions</p>
+            <div className="max-w-6xl mx-auto px-4 py-6">
+                <div className="mb-6 text-center">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">My Courses & Live Rooms</h1>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">View your assigned courses and join live sessions</p>
                 </div>
 
                 {teacherCourses.length === 0 ? (
-                    <div className="text-center py-8 sm:py-12">
-                        <BookOpen className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Courses Assigned</h3>
-                        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">You don't have any courses assigned to you yet.</p>
+                    <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                        <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Courses Assigned</h3>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">You don't have any courses assigned to you yet.</p>
                     </div>
                 ) : (
-                    <div className="space-y-6 sm:space-y-8">
+                    <div className="space-y-6">
                         {teacherCourses.map((course) => {
                             const courseRooms = rooms.filter((room) => room.course_id === course.id)
                             const courseEnrollments = enrollmentsByCourse[course.id] || []
                             const enrolledCount = courseEnrollments.length
                             return (
-                                <div key={course.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                                    {/* Course Header with Thumbnail */}
-                                    <div className="relative">
-                                        {/* Course Thumbnail */}
-                                        <div className="h-48 bg-gradient-to-r from-blue-500 to-purple-600 relative overflow-hidden">
-                                            {course.thumbnail ? (
-                                                <img
-                                                    src={course.thumbnail}
-                                                    alt={course.title}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center">
-                                                    <BookOpen className="h-16 w-16 text-white opacity-80" />
+                                <div key={course.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
+                                    {/* Course Header */}
+                                    <div className="p-4 border-b border-gray-100 dark:border-gray-600">
+                                        <div className="flex items-start gap-4">
+                                            {/* Course Thumbnail */}
+                                            <div className="flex-shrink-0">
+                                                <div className="w-20 h-20 rounded-lg overflow-hidden bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30">
+                                                    {course.thumbnail ? (
+                                                        <img
+                                                            src={course.thumbnail}
+                                                            alt={course.title}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <BookOpen className="h-8 w-8 text-blue-500 dark:text-blue-400" />
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                            {/* Overlay with course info */}
-                                            <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
-                                                <div className="p-6 w-full">
-                                                    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                                                        <div className="text-white">
-                                                            <h2 className="text-2xl sm:text-3xl font-bold mb-2">{course.title}</h2>
-                                                            <p className="text-white/90 text-sm sm:text-base mb-3 line-clamp-2">
-                                                                {course.description || "No description available"}
-                                                            </p>
-                                                            <div className="flex flex-wrap items-center gap-3 text-sm">
-                                                                <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
-                                                                    <ClockIcon size={14} />
-                                                                    <span>{course.duration}</span>
-                                                                </div>
-                                                                <div className={`px-3 py-1 rounded-full text-xs font-medium ${getLevelColor(course.level)}`}>
-                                                                    {course.level}
-                                                                </div>
-                                                                <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
-                                                                    <MapPin size={14} />
-                                                                    <span>{course.category}</span>
-                                                                </div>
+                                            </div>
+
+                                            {/* Course Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between mb-3">
+                                                    <div>
+                                                        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">{course.title}</h2>
+                                                        <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-3">
+                                                            {course.description || "No description available"}
+                                                        </p>
+                                                        <div className="flex items-center gap-4 text-sm">
+                                                            <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                                                                <ClockIcon size={16} />
+                                                                <span className="font-medium">{course.duration}</span>
+                                                            </div>
+                                                            <div className={`px-3 py-1 rounded-full text-xs font-medium ${getLevelColor(course.level)}`}>
+                                                                {course.level}
+                                                            </div>
+                                                            <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
+                                                                <MapPin size={16} />
+                                                                <span>{course.category}</span>
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-4 text-white/90">
-                                                            <div className="text-center">
-                                                                <div className="text-2xl font-bold">{courseRooms.length}</div>
-                                                                <div className="text-xs opacity-80">Live Rooms</div>
-                                                            </div>
-                                                            <div className="text-center">
-                                                                <div className="text-2xl font-bold">{enrolledCount}</div>
-                                                                <div className="text-xs opacity-80">Students</div>
-                                                            </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-4 text-right">
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{courseRooms.length}</div>
+                                                            <div className="text-xs text-gray-500">Live Rooms</div>
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{enrolledCount}</div>
+                                                            <div className="text-xs text-gray-500">Students</div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -583,12 +586,12 @@ const TeacherCourses = () => {
                                     </div>
 
                                     {/* Live Rooms Section */}
-                                    <div className="p-6">
+                                    <div className="p-4">
                                         {courseRooms.length === 0 ? (
-                                            <div className="text-center py-8">
+                                            <div className="text-center py-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                                                 <Video className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                                                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Live Rooms Yet</h3>
-                                                <p className="text-gray-600 dark:text-gray-400">Create your first live session room to start teaching.</p>
+                                                <p className="text-gray-600 dark:text-gray-400 text-sm">Create your first live session room to start teaching.</p>
                                             </div>
                                         ) : (
                                             <div className="space-y-4">
@@ -600,43 +603,76 @@ const TeacherCourses = () => {
                                                     {courseRooms.map((room) => (
                                                         <div
                                                             key={room.id}
-                                                            className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-200"
+                                                            className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700/50 dark:to-blue-900/20 rounded-lg p-4 border border-gray-200 dark:border-gray-600 hover:shadow-md transition-all duration-200"
                                                         >
-                                                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                                            <div className="flex items-start justify-between gap-4">
                                                                 <div className="flex items-start gap-4 min-w-0 flex-1">
-                                                                    <div className={`w-3 h-3 rounded-full ${getStatusColor(room.status)} flex-shrink-0 mt-2`}></div>
-                                                                    <div className="min-w-0 flex-1">
-                                                                        <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-lg mb-2">{room.room_name}</h4>
-                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-gray-600 dark:text-gray-400">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <Calendar size={16} className="text-blue-500" />
-                                                                                <span>{new Date(room.start_time).toLocaleDateString()}</span>
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <Clock size={16} className="text-green-500" />
-                                                                                <span>{new Date(room.start_time).toLocaleTimeString()}</span>
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <Users size={16} className="text-purple-500" />
-                                                                                <span>Max {room.max_participants} participants</span>
-                                                                            </div>
+                                                                    {/* Status Indicator */}
+                                                                    <div className="flex-shrink-0 mt-1">
+                                                                        <div className={`w-4 h-4 rounded-full ${getStatusColor(room.status)} flex items-center justify-center`}>
+                                                                            {room.status === 'live' && <Mic className="h-2.5 w-2.5 text-white" />}
+                                                                            {room.status === 'scheduled' && <Clock3 className="h-2.5 w-2.5 text-white" />}
+                                                                            {room.status === 'ended' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
                                                                         </div>
-                                                                        {room.description && (
-                                                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 italic">"{room.description}"</p>
-                                                                        )}
-                                                                        <div className="mt-3">
-                                                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${room.status === 'live' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                                                                                    room.status === 'scheduled' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                                                                                        'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                                                                    </div>
+
+                                                                    {/* Room Details */}
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="flex items-center gap-3 mb-3">
+                                                                            <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-lg">{room.room_name}</h4>
+                                                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${room.status === 'live' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400' :
+                                                                                room.status === 'scheduled' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400' :
+                                                                                    'bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-400'
                                                                                 }`}>
-                                                                                <div className={`w-2 h-2 rounded-full mr-2 ${getStatusColor(room.status)}`}></div>
                                                                                 {getStatusText(room.status)}
                                                                             </span>
                                                                         </div>
+
+                                                                        {/* Room Info Grid */}
+                                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Calendar size={16} className="text-blue-500 flex-shrink-0" />
+                                                                                <div>
+                                                                                    <div className="font-medium">Date</div>
+                                                                                    <div>{new Date(room.start_time).toLocaleDateString('en-US', {
+                                                                                        weekday: 'long',
+                                                                                        year: 'numeric',
+                                                                                        month: 'long',
+                                                                                        day: 'numeric'
+                                                                                    })}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Clock size={16} className="text-green-500 flex-shrink-0" />
+                                                                                <div>
+                                                                                    <div className="font-medium">Time</div>
+                                                                                    <div>{new Date(room.start_time).toLocaleTimeString('en-US', {
+                                                                                        hour: '2-digit',
+                                                                                        minute: '2-digit',
+                                                                                        hour12: true
+                                                                                    })}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Users2 size={16} className="text-purple-500 flex-shrink-0" />
+                                                                                <div>
+                                                                                    <div className="font-medium">Capacity</div>
+                                                                                    <div>Max {room.max_participants} participants</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Room Description */}
+                                                                        {room.description && (
+                                                                            <div className="bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-100 dark:border-gray-600">
+                                                                                <p className="text-sm text-gray-700 dark:text-gray-300 italic">"{room.description}"</p>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </div>
 
-                                                                <div className="flex items-center gap-3 self-end lg:self-auto">
+                                                                {/* Action Buttons */}
+                                                                <div className="flex flex-col items-end gap-3 self-start">
                                                                     <button
                                                                         onClick={() => handleCopyRoomId(room.room_id)}
                                                                         className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-all duration-200"
