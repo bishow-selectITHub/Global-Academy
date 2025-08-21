@@ -86,7 +86,7 @@ const TeacherCourses = () => {
     useEffect(() => {
         if (!coursesLoading && courses.length > 0 && user?.email) {
             const teacherCourses = courses.filter(
-                (course) => course.teacherEmail === user?.email || course.instructor === user?.name,
+                (course) => course.teacherEmail === user?.email
             )
 
             teacherCourses.forEach((course) => {
@@ -96,8 +96,7 @@ const TeacherCourses = () => {
     }, [dispatch, courses, coursesLoading, user?.email, user?.name])
 
     const teacherCourses = courses.filter(
-        (course) => course.teacherEmail === user?.email || course.instructor === user?.name,
-    )
+        (course) => course.teacherEmail === user?.email)
 
     const handleJoinSession = async (room: any) => {
         setJoiningSession(room.id)
