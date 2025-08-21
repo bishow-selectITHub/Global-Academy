@@ -1,6 +1,7 @@
 "use client"
 import React from "react"
 import { useState, useEffect, useRef } from "react"
+import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
   Copy,
@@ -39,9 +40,9 @@ interface HostLiveSessionProps {
 }
 
 // API Constants
-const CREATE_ROOM_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-hms-room`
-const GENERATE_TOKEN_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-hms-token`
-const FETCH_RECORDINGS_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-hms-recordings`
+const CREATE_ROOM_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL || 'https://smqnaddacvwwuehxymbr.supabase.co'}/functions/v1/create-hms-room`
+const GENERATE_TOKEN_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL || 'https://smqnaddacvwwuehxymbr.supabase.co'}/functions/v1/generate-hms-token`
+const FETCH_RECORDINGS_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL || 'https://smqnaddacvwwuehxymbr.supabase.co'}/functions/v1/fetch-hms-recordings`
 
 const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => {
   const [activeTab, setActiveTab] = useState<"enrolled" | "schedule" | "attendance" | "recordings" | "notes">("enrolled")
@@ -716,122 +717,78 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
 
       const {
         data: { session: authSession },
-        error: sessionError,
       } = await supabase.auth.getSession()
-      if (sessionError || !authSession?.access_token || !authSession?.user) {
-        throw new Error("You must be logged in to join.")
+      if (!authSession?.access_token) {
+        throw new Error("You must be logged in to start a session.")
       }
-      const roomId = session.room_id
-      const role = "host"
-      const response = await fetch(GENERATE_TOKEN_ENDPOINT, {
+
+      console.log("🚀 [DEBUG] User authenticated, starting session creation")
+
+      // Create a new HMS room
+      const createRoomRes = await fetch(CREATE_ROOM_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${authSession.access_token}`,
         },
         body: JSON.stringify({
-          room_id: roomId,
-          role: role,
-          wait_for_active_session: false,
+          room_id: session.room_id,
+          room_name: session.room_name,
+          user_id: authSession.user.id,
         }),
       })
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to generate 100ms token")
+
+      if (!createRoomRes.ok) {
+        const errorData = await createRoomRes.json()
+        throw new Error(errorData.error || "Failed to create HMS room")
       }
 
-      const tokenData = await response.json()
-      console.log("🚀 [DEBUG] Token generated successfully:", {
-        token: tokenData.token ? "TOKEN_RECEIVED" : "NO_TOKEN",
-        roomId,
-        role
+      const createRoomData = await createRoomRes.json()
+      console.log("🚀 [DEBUG] HMS room created:", createRoomData)
+
+      // Generate token for the host
+      const tokenRes = await fetch(GENERATE_TOKEN_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession.access_token}`,
+        },
+        body: JSON.stringify({
+          user_id: authSession.user.id,
+          room_id: session.room_id,
+          role: "host",
+        }),
       })
 
-      // Persist the live_rooms.id synchronously to avoid state race
-      hostLiveRoomIdRef.current = session.id
-      hostHmsRoomIdRef.current = session.room_id
-      setVideoToken(tokenData.token)
-      setVideoUserName(instructor)
-      // Track which live_rooms.id we're about to run as host
-      setPendingRoomId(session.id)
-      console.log("🚀 [DEBUG] pendingRoomId set to:", session.id)
-
-      // Fallback persist after join: poll for an active session id and persist if onSessionStarted didn't run
-      try {
-        if (persistFallbackTimerRef.current) {
-          clearTimeout(persistFallbackTimerRef.current)
-          persistFallbackTimerRef.current = null
-        }
-        persistFallbackTimerRef.current = window.setTimeout(async () => {
-          if (hasPersistedRef.current || isPersistingRef.current) {
-            console.log("[DEBUG] Fallback skipped; already persisted or persisting")
-            return
-          }
-          try {
-            console.log("[DEBUG] Fallback polling for active 100ms session…")
-            const {
-              data: { session: authSession },
-            } = await supabase.auth.getSession()
-            if (!authSession?.access_token) return
-            const res = await fetch(GENERATE_TOKEN_ENDPOINT, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${authSession.access_token}`,
-              },
-              body: JSON.stringify({ room_id: session.room_id, role: "host", wait_for_active_session: true }),
-            })
-            const js = await res.json().catch(() => ({}))
-            const fallbackSessionId = js?.session_id || js?.sessionInstanceId
-            console.log("[DEBUG] Fallback token response:", { ok: res.ok, fallbackSessionId })
-            const roomIdToUse = hostLiveRoomIdRef.current || session.id
-            if (fallbackSessionId && roomIdToUse) {
-              isPersistingRef.current = true
-              const { data: existing } = await supabase
-                .from("room_sessions")
-                .select("session_id")
-                .eq("session_id", fallbackSessionId)
-                .maybeSingle()
-              if (!existing) {
-                const { data, error } = await supabase
-                  .from("room_sessions")
-                  .insert({ room_id: roomIdToUse, session_id: fallbackSessionId, active: true })
-                  .select("id")
-                  .single()
-                if (!error && data?.id) {
-                  console.log("[DEBUG] Fallback persisted room_sessions row", data.id)
-                  setCurrentSessionData({ roomId: roomIdToUse, sessionId: data.id })
-                  hasPersistedRef.current = true
-                } else {
-                  console.warn("[DEBUG] Fallback persist failed", error)
-                }
-              } else {
-                console.log("[DEBUG] Fallback found existing room_sessions row; skipping insert")
-              }
-            }
-          } catch (e) {
-            console.warn("[DEBUG] Fallback polling error", e)
-          } finally {
-            isPersistingRef.current = false
-          }
-        }, 7000)
-      } catch (_) {
-        // ignore fallback error
+      if (!tokenRes.ok) {
+        const errorData = await tokenRes.json()
+        throw new Error(errorData.error || "Failed to generate host token")
       }
 
-      // Do not pre-save using a possibly ended session id; wait for onSessionStarted
+      const tokenData = await tokenRes.json()
+      console.log("🚀 [DEBUG] Host token generated:", {
+        hasToken: !!tokenData.token,
+        tokenLength: tokenData.token?.length
+      })
 
+      // Set the pending room ID for the session started callback
+      setPendingRoomId(session.id)
+      hostLiveRoomIdRef.current = session.id
 
+      // Start the video session
+      setVideoToken(tokenData.token)
+      setVideoUserName(authSession.user.id || "Host")
+      setJoiningSession(null)
+
+      console.log("🚀 [DEBUG] Video session started successfully")
     } catch (error: any) {
-      console.error("Error joining session:", error)
+      console.error("Failed to start session:", error)
       addToast?.({
         type: "error",
         title: "Error",
-        message: error.message || "Failed to join session.",
+        message: error.message || "Failed to start session",
       })
-      // Stop the button spinner on failure
       setJoiningSession(null)
-    } finally {
     }
   }
 
@@ -895,10 +852,10 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
     setSessionAttendees([])
   }
 
-  const instructor = course.instructor || "Dr. Jane Doe"
-  const instructorTitle = course.instructor_title || "Lead Instructor"
+  const teacherEmail = course.teacherEmail || "teacher@example.com"
+  const teacherName = course.instructor || "Dr. Jane Doe"
   const instructorAvatar =
-    course.instructor_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(instructor)}`
+    course.teacher_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(teacherName)}`
 
   const TabButton = ({
     tab,
@@ -957,9 +914,9 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
                   {course.title}
                 </h1>
                 <div className="flex items-center gap-4 mb-2">
-                  <div className="text-gray-700 font-medium text-sm">{instructor}</div>
+                  <div className="text-gray-700 font-medium text-sm">{teacherName}</div>
                   <div className="text-indigo-600 text-xs font-medium bg-indigo-50 px-2 py-1 rounded-full">
-                    {instructorTitle}
+                    {teacherEmail}
                   </div>
                 </div>
                 <div className="flex items-center gap-6 text-xs">
@@ -1838,174 +1795,66 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         )}
       </div>
       {/* Video Call Modal */}
-      {videoToken && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
-          <div className="w-full h-full relative">
-            {/* End Session Button */}
-            {/*<button
-              onClick={handleEndSession}
-              className="absolute top-4 right-4 z-10 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg"
-            >
-              <X className="w-4 h-4" />
-              End Session
-            </button> */}
-
-            <HMSRoomKitHost
-              token={videoToken}
-              userName={videoUserName || "Host"}
-              onSessionStarted={async (hmsSessionId, hmsRoomId) => {
-                try {
-                  if (hasPersistedRef.current || isPersistingRef.current) {
-                    console.log("[DEBUG] Skipping duplicate onSessionStarted persist")
-                    return
-                  }
-                  isPersistingRef.current = true
-                  console.log("🚀 [DEBUG] onSessionStarted called with:", {
-                    hmsSessionId,
-                    hmsRoomId,
-                    pendingRoomId
-                  })
-
-                  // Use the pendingRoomId (from live_rooms.id) which we know
-                  // We also have the new session ID from 100ms
-                  const room_id = hostLiveRoomIdRef.current || pendingRoomId || (hmsRoomId ? (sessions.find((s) => s.room_id === hmsRoomId)?.id ?? null) : null)
-                  if (!room_id) {
-                    console.error("❌ Error: Live Room ID is missing. pendingRoomId:", pendingRoomId)
-                    isPersistingRef.current = false
-                    return
-                  }
-
-                  // Fetch the current user to get their ID
-                  const { data: { user } } = await supabase.auth.getUser()
-                  if (!user) {
-                    console.error("❌ Error: User not authenticated.")
-                    return
-                  }
-
-                  console.log("🚀 [DEBUG] Insert data for room_sessions:", {
-                    room_id,
-                    hmsSessionId,
-                    active: true,
-                    userId: user.id
-                  })
-
-                  // Safely create or re-activate without requiring a DB unique index
-                  let newRoomSession: { id: string } | null = null
-                  let roomSessionError: any = null
-                  try {
-                    const { data: existing } = await supabase
-                      .from("room_sessions")
-                      .select("session_id")
-                      .eq("session_id", hmsSessionId)
-                      .maybeSingle()
-                    console.log("Existing Data:", existing)
-                    if (!existing) {
-                      const { data, error } = await supabase
-                        .from("room_sessions")
-                        .insert({ room_id: room_id, session_id: hmsSessionId, active: true })
-                        .select("id")
-                        .single()
-                      newRoomSession = data as any
-                      roomSessionError = error
-                    } else {
-                      newRoomSession = null
-                    }
-                  } catch (err) {
-                    roomSessionError = err
-                  }
-
-                  if (roomSessionError) {
-                    console.error("❌ Error creating room session:", roomSessionError)
-                    addToast?.({
-                      type: "error",
-                      title: "Database Error",
-                      message: "Failed to start room session in the database.",
-                    })
-                    return
-                  }
-
-                  // Update the local state with the new session data
-                  const createdId = newRoomSession?.id
-                  if (createdId) {
-                    setCurrentSessionData({ roomId: room_id, sessionId: createdId })
-                  }
-                  console.log("✅ Supabase insertion successful:", {
-                    roomSessionId: createdId,
-                    roomId: room_id,
-                    hmsSessionId: hmsSessionId
-                  })
-
-                  // Also update the status of the parent `live_rooms` table to 'live'
-                  const { error: updateError } = await supabase
-                    .from("live_rooms")
-                    .update({ status: 'live' })
-                    .eq("id", room_id)
-
-                  if (updateError) {
-                    console.error("❌ Error updating live_rooms status:", updateError)
-                  } else {
-                    console.log("✅ live_rooms status updated to 'live' for room:", room_id)
-                  }
-                  hasPersistedRef.current = true
-                } catch (e: any) {
-                  console.error("Failed to start session and update database:", e.message)
-                  addToast?.({
-                    type: "error",
-                    title: "Error",
-                    message: "Failed to start session properly.",
-                  })
-                } finally {
-                  isPersistingRef.current = false
-                }
-              }}
-              onRoomEnd={async () => {
-                if (persistFallbackTimerRef.current) {
-                  clearTimeout(persistFallbackTimerRef.current)
-                  persistFallbackTimerRef.current = null
-                }
-                if (currentSessionData) {
-                  try {
-                    // Update the room_sessions table to mark it as inactive
-                    await supabase
-                      .from("room_sessions")
-                      .update({ active: false })
-                      .eq("id", currentSessionData.sessionId)
-                      .eq("room_id", currentSessionData.roomId)
-
-                    // Also update the status of the parent `live_rooms` table to 'completed'
-                    await supabase
-                      .from("live_rooms")
-                      .update({ status: 'completed' })
-                      .eq("id", currentSessionData.roomId)
-
-                    console.log("Session ended and database updated.")
-                  } catch (error: any) {
-                    console.error("Error ending session:", error)
-                    addToast?.({
-                      type: "error",
-                      title: "Error",
-                      message: "Failed to end session properly.",
-                    })
-                  }
-                }
+      {videoToken && createPortal(
+        <div className="fixed inset-0 bg-black" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', zIndex: 999999 }}>
+          {/* Meeting popup container - full screen */}
+          <div className="w-full h-full bg-black relative">
+            <button
+              onClick={() => {
                 setVideoToken(null)
                 setVideoUserName("")
                 setCurrentSessionData(null)
-                // Reset flags so a new session can be persisted on next start
                 hasPersistedRef.current = false
                 isPersistingRef.current = false
                 hostLiveRoomIdRef.current = null
                 hostHmsRoomIdRef.current = null
                 setPendingRoomId(null)
-                addToast?.({
-                  type: "success",
-                  title: "Session Ended",
-                  message: "Live session has been ended successfully.",
-                })
+                setJoiningSession(null)
+                if (persistFallbackTimerRef.current) {
+                  clearTimeout(persistFallbackTimerRef.current)
+                  persistFallbackTimerRef.current = null
+                }
+              }}
+              className="absolute top-4 right-4 z-10 w-8 h-8 bg-gray-800 hover:bg-gray-700 text-white rounded-full flex items-center justify-center transition-colors"
+              title="Close meeting"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <HMSRoomKitHost
+              token={videoToken}
+              userName={videoUserName}
+              onRoomEnd={() => {
+                setVideoToken(null)
+                setVideoUserName("")
+                setCurrentSessionData(null)
+                hasPersistedRef.current = false
+                isPersistingRef.current = false
+                hostLiveRoomIdRef.current = null
+                hostHmsRoomIdRef.current = null
+                setPendingRoomId(null)
+                setJoiningSession(null)
+                if (persistFallbackTimerRef.current) {
+                  clearTimeout(persistFallbackTimerRef.current)
+                  persistFallbackTimerRef.current = null
+                }
+              }}
+              onSessionStarted={(sessionId) => {
+                console.log("🚀 [DEBUG] Session started with ID:", sessionId)
+                setCurrentSessionData(prev => prev ? { ...prev, sessionId } : null)
               }}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

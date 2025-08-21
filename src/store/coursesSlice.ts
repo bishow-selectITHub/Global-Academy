@@ -11,7 +11,7 @@ interface Course {
     level: string;
     is_active: boolean;
     instructor: string;
-    instructor_title?: string;
+    teacherEmail?: string;
     instructor_avatar?: string;
     category: string;
     objectives?: string[];

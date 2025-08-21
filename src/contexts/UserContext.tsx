@@ -198,7 +198,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       dispatch(rootLogout()); // Clear all Redux state
 
       // Navigate immediately for better UX
-      navigate('/login');
+      navigate('/');
 
       // Sign out from Supabase in background
       const { error } = await supabase.auth.signOut();

@@ -26,7 +26,7 @@ interface CourseFormData {
   level: 'beginner' | 'intermediate' | 'advanced';
   isActive: boolean;
   instructor: string;
-  instructorTitle: string;
+  teacherEmail: string;
   instructor_avatar: File | null;
   instructor_avatarUrl: string;
   objectives: string[];
@@ -59,7 +59,7 @@ const CourseEditor = () => {
     level: 'beginner',
     isActive: true,
     instructor: '',
-    instructorTitle: '',
+    teacherEmail: '',
     instructor_avatar: null,
     instructor_avatarUrl: '',
     objectives: [],
@@ -91,7 +91,7 @@ const CourseEditor = () => {
         level: currentCourse.level as 'beginner' | 'intermediate' | 'advanced',
         isActive: currentCourse.is_active,
         instructor: currentCourse.instructor,
-        instructorTitle: currentCourse.instructor_title || '',
+        teacherEmail: currentCourse.teacherEmail || '',
         instructor_avatar: null,
         instructor_avatarUrl: currentCourse.instructor_avatar || '',
         objectives: currentCourse.objectives || [],
@@ -206,7 +206,7 @@ const CourseEditor = () => {
         level: formData.level,
         is_active: formData.isActive,
         instructor: formData.instructor,
-        instructor_title: formData.instructorTitle,
+        teacherEmail: formData.teacherEmail,
         instructor_avatar: instructor_avatarUrl,
         category: formData.category,
         objectives: formData.objectives,
@@ -237,15 +237,15 @@ const CourseEditor = () => {
         duration: 5000,
       });
       navigate('/admin/courses');
-          } catch (error) {
-        console.error('Error saving course:', error);
-        addToast({
-          type: 'error',
-          title: 'Error saving course',
-          message: 'Please try again later.',
-          duration: 5000,
-        });
-      }
+    } catch (error) {
+      console.error('Error saving course:', error);
+      addToast({
+        type: 'error',
+        title: 'Error saving course',
+        message: 'Please try again later.',
+        duration: 5000,
+      });
+    }
   };
 
   const handleAddLesson = () => {
@@ -333,7 +333,7 @@ const CourseEditor = () => {
       return;
     }
 
-    
+
 
     try {
       // Delete the course from Supabase
@@ -392,7 +392,7 @@ const CourseEditor = () => {
         duration: 5000,
       });
     } finally {
-      
+
     }
   };
 
@@ -554,12 +554,12 @@ const CourseEditor = () => {
                     disabled={loading}
                   />
                   <Input
-                    id="instructorTitle"
-                    name="instructorTitle"
-                    label="Instructor Title"
-                    placeholder="Enter instructor title"
+                    id="teacherEmail"
+                    name="teacherEmail"
+                    label="Teacher Email"
+                    placeholder="Enter teacher email"
                     className='p-2'
-                    value={formData.instructorTitle}
+                    value={formData.teacherEmail}
                     onChange={handleChange}
                     fullWidth
                     disabled={loading}

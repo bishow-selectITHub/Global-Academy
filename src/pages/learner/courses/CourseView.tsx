@@ -8,13 +8,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchNotesByCourse } from '../../../store/notesSlice';
 import type { AppDispatch } from '../../../store';
 import { RootState } from '../../../store';
+import { createPortal } from 'react-dom';
 
 
 import { supabase } from '../../../lib/supabase';
 import { HMSRoomProvider } from "@100mslive/react-sdk";
 import HMSRoomKitHost from '../../../components/live/HMSRoomKitHost';
 
-const GENERATE_TOKEN_ENDPOINT = "https://smqnaddacvwwuehxymbr.supabase.co/functions/v1/generate-hms-token";
+const GENERATE_TOKEN_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL || 'https://smqnaddacvwwuehxymbr.supabase.co'}/functions/v1/generate-hms-token`;
 
 // <CHANGE> Keep all existing interfaces and components unchanged
 // Live session modal replaced by opening /live/join in new tab
@@ -23,6 +24,7 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
     const [sessions, setSessions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [joinProps, setJoinProps] = useState<{ token: string; userName: string } | null>(null);
+    const [joiningSession, setJoiningSession] = useState<string | null>(null);
     // modal state removed
 
     useEffect(() => {
@@ -40,16 +42,27 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
     }, [courseId]);
 
     const handleJoinSession = async (session: any) => {
-        const sessionResponse = await supabase.auth.getSession();
-        const accessToken = sessionResponse.data.session?.access_token;
-        const user = sessionResponse.data.session?.user;
-
-        if (!user || !accessToken) {
-            alert('You must be logged in to join.');
-            return;
-        }
-
+        setJoiningSession(session.id);
         try {
+            console.log("🚀 [DEBUG] Starting to join session:", {
+                sessionId: session.id,
+                roomId: session.room_id,
+                sessionName: session.room_name
+            });
+
+            const sessionResponse = await supabase.auth.getSession();
+            const accessToken = sessionResponse.data.session?.access_token;
+            const user = sessionResponse.data.session?.user;
+
+            if (!user || !accessToken) {
+                throw new Error('You must be logged in to join.');
+            }
+
+            console.log("🚀 [DEBUG] User authenticated:", {
+                userId: user.id,
+                hasAccessToken: !!accessToken
+            });
+
             let activeSessionId: string | null = null;
             try {
                 const { data: activeRow } = await supabase
@@ -59,10 +72,13 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
                     .eq('active', true)
                     .maybeSingle();
                 activeSessionId = activeRow?.session_id || null;
+                console.log("🚀 [DEBUG] Active session found:", activeSessionId);
             } catch (_) {
+                console.log("🚀 [DEBUG] No active session found, will create new one");
                 // ignore, will fallback below
             }
 
+            console.log("🚀 [DEBUG] Calling token endpoint:", GENERATE_TOKEN_ENDPOINT);
             const res = await fetch(GENERATE_TOKEN_ENDPOINT, {
                 method: 'POST',
                 headers: {
@@ -76,9 +92,18 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
                     wait_for_active_session: true,
                 }),
             });
+
+            console.log("🚀 [DEBUG] Token response status:", res.status);
             const data = await res.json();
-            console.log("🚀 [APP][HMS] learner token response:", { sessionId: data.session_id || data.sessionInstanceId, roomId: session.room_id })
+            console.log("🚀 [DEBUG] Token response data:", data);
+
             if (!res.ok) throw new Error(data.error || 'Failed to generate 100ms token');
+
+            console.log("🚀 [DEBUG] Token generated successfully:", {
+                hasToken: !!data.token,
+                tokenLength: data.token?.length,
+                sessionId: data.session_id || data.sessionInstanceId
+            });
 
             const realSessionId = activeSessionId || data.session_id || data.sessionInstanceId;
             if (realSessionId) {
@@ -106,9 +131,15 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
             }
 
             // Render 100ms SDK inline (same tab)
+            console.log("🚀 [DEBUG] Setting join props:", {
+                hasToken: !!data.token,
+                userName: user.id
+            });
             setJoinProps({ token: data.token, userName: user.id });
         } catch (err: any) {
+            console.error('Error joining session:', err);
             alert(err.message);
+            setJoiningSession(null);
         }
     };
 
@@ -121,15 +152,42 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
 
     // If joining, render HMS Room Prebuilt inline
     if (joinProps) {
-        return (
-            <div className="fixed inset-0 z-50 bg-black">
-                <HMSRoomKitHost
-                    token={joinProps.token}
-                    userName={joinProps.userName}
-                    onRoomEnd={() => setJoinProps(null)}
-                />
+        const modalContent = (
+            <div className="fixed inset-0 bg-black" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', zIndex: 999999 }}>
+                {/* Meeting popup container - full screen */}
+                <div className="w-full h-full bg-black relative">
+                    <button
+                        onClick={() => {
+                            setJoinProps(null);
+                            setJoiningSession(null);
+                        }}
+                        className="absolute top-4 right-4 z-10 w-8 h-8 bg-gray-800 hover:bg-gray-700 text-white rounded-full flex items-center justify-center transition-colors"
+                        title="Close meeting"
+                    >
+                        <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+
+                    <HMSRoomKitHost
+                        token={joinProps.token}
+                        userName={joinProps.userName}
+                        onRoomEnd={() => {
+                            setJoinProps(null);
+                            setJoiningSession(null);
+                        }}
+                    />
+                </div>
             </div>
         );
+
+        return createPortal(modalContent, document.body);
     }
 
     return (
@@ -163,9 +221,17 @@ const LearnerLiveSessions = ({ courseId }: { courseId: string }) => {
                                     </div>
                                     <Button
                                         onClick={() => handleJoinSession(session)}
-                                        className="bg-purple-600 text-white  font-semibold px-6 py-2 rounded-lg transition-colors"
+                                        disabled={joiningSession === session.id}
+                                        className="bg-purple-600 text-white font-semibold px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
                                     >
-                                        Join Session
+                                        {joiningSession === session.id ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                                                Joining...
+                                            </>
+                                        ) : (
+                                            'Join Session'
+                                        )}
                                     </Button>
                                 </div>
                             </div>

@@ -45,7 +45,7 @@ interface Course {
   level: "beginner" | "intermediate" | "advanced"
   is_active: boolean
   instructor: string
-  instructor_title: string
+  teacherEmail: string
   instructor_avatar: string
   objectives: string[]
   category: "Technology" | "Food" | "Education" | "Travel" | "Life Lessons" | "Others"

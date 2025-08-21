@@ -102,7 +102,7 @@ const CourseViewPage = () => {
                             )}
                             <div>
                                 <div className="font-bold text-gray-800 text-lg">{course.instructor}</div>
-                                <div className="text-sm text-gray-500">{course.instructor_title}</div>
+                                <div className="text-sm text-gray-500">{course.teacherEmail}</div>
                             </div>
                         </div>
                     )}

@@ -248,7 +248,7 @@ const CourseManagement = () => {
                 )}
                 <div>
                   <div className="font-medium text-gray-800 text-sm">{courseDetails.instructor}</div>
-                  <div className="text-xs text-gray-500">{courseDetails.instructor_title}</div>
+                  <div className="text-xs text-gray-500">{courseDetails.teacherEmail}</div>
                 </div>
               </div>
             )}
@@ -372,9 +372,8 @@ const CourseManagement = () => {
                   {/* Status Badge */}
                   <div className="absolute top-2 left-2">
                     <span
-                      className={`px-2 py-1 text-xs font-medium rounded ${
-                        course.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
-                      }`}
+                      className={`px-2 py-1 text-xs font-medium rounded ${course.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
+                        }`}
                     >
                       {course.is_active ? "Published" : "Draft"}
                     </span>
