@@ -18,7 +18,7 @@ const TeacherLayout = () => {
     const navItems = [
         { path: "/teacher", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
         { path: "/teacher/join-meeting", label: "Join Meeting", icon: <Video size={20} /> },
-        { path: "/teacher/student-attendance", label: "Student Attendance", icon: <UserCheck size={20} /> },
+        { path: "/teacher/attendance", label: "Student Attendance", icon: <UserCheck size={20} /> },
     ]
 
     const isActive = (path: string) => {

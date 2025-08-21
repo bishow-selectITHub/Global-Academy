@@ -27,7 +27,7 @@ const TeacherDashboard = () => {
     }, [dispatch])
 
     const teacherCourses = courses.filter(
-        (course) => course.instructorEmail === user?.email || course.instructor === user?.name,
+        (course) => course.teacherEmail === user?.email || course.instructor === user?.name,
     )
 
     const teacherSessions = liveSessions.filter((session) =>
@@ -118,8 +118,8 @@ const TeacherDashboard = () => {
                     <button
                         onClick={() => setActiveView("overview")}
                         className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeView === "overview"
-                                ? "bg-blue-600 text-white"
-                                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            ? "bg-blue-600 text-white"
+                            : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                             }`}
                     >
                         Overview
@@ -127,8 +127,8 @@ const TeacherDashboard = () => {
                     <button
                         onClick={() => setActiveView("join-meeting")}
                         className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${activeView === "join-meeting"
-                                ? "bg-green-600 text-white"
-                                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            ? "bg-green-600 text-white"
+                            : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                             }`}
                     >
                         <Video size={16} />
@@ -137,8 +137,8 @@ const TeacherDashboard = () => {
                     <button
                         onClick={() => setActiveView("attendance")}
                         className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${activeView === "attendance"
-                                ? "bg-purple-600 text-white"
-                                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            ? "bg-purple-600 text-white"
+                            : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                             }`}
                     >
                         <UserCheck size={16} />
@@ -220,10 +220,10 @@ const TeacherDashboard = () => {
                                                             <div className="flex items-center gap-4">
                                                                 <div
                                                                     className={`w-3 h-3 rounded-full ${session.status === "live"
-                                                                            ? "bg-red-500"
-                                                                            : session.status === "scheduled"
-                                                                                ? "bg-yellow-500"
-                                                                                : "bg-gray-400"
+                                                                        ? "bg-red-500"
+                                                                        : session.status === "scheduled"
+                                                                            ? "bg-yellow-500"
+                                                                            : "bg-gray-400"
                                                                         }`}
                                                                 ></div>
                                                                 <div>

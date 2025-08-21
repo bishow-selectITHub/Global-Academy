@@ -59,6 +59,7 @@ import Testimonials from "./pages/landing/Testimonials"
 import About from "./pages/landing/About"
 import Contact from "./pages/landing/Contact"
 import TeacherCourses from "./pages/teacher/courses/TeacherCourses"
+import TeacherAttendance from "./pages/teacher/attendance"
 
 function Prefetcher() {
   const dispatch = useDispatch<AppDispatch>()
@@ -154,6 +155,7 @@ function App() {
               >
                 <Route path="/teacher" element={<TeacherDashboard />} />
                 <Route path="/teacher/join-meeting" element={<TeacherCourses />} />
+                <Route path="/teacher/attendance" element={<TeacherAttendance />} />
               </Route>
 
               {/* Learner Routes */}
