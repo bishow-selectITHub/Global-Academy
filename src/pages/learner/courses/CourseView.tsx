@@ -15,6 +15,7 @@ import { supabase } from '../../../lib/supabase';
 import { HMSRoomProvider } from "@100mslive/react-sdk";
 import HMSRoomKitHost from '../../../components/live/HMSRoomKitHost';
 
+
 const GENERATE_TOKEN_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL || 'https://smqnaddacvwwuehxymbr.supabase.co'}/functions/v1/generate-hms-token`;
 
 // <CHANGE> Keep all existing interfaces and components unchanged
@@ -315,6 +316,36 @@ const CourseView = () => {
         navigate(`/enroll/${courseId}`);
     };
 
+    const handleResourceDownload = async (note: any) => {
+        try {
+            // Create a temporary anchor element to trigger download
+            const link = document.createElement('a');
+            link.href = note.file_url;
+            link.download = getNoteDisplayName(note) || 'course-resource';
+            link.target = '_blank';
+
+            // Append to body, click, and remove
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            addToast({
+                type: 'success',
+                title: 'Download Started',
+                message: 'Resource download has started.',
+                duration: 3000,
+            });
+        } catch (error) {
+            console.error('Error downloading resource:', error);
+            addToast({
+                type: 'error',
+                title: 'Download Failed',
+                message: 'Failed to download resource. Please try again.',
+                duration: 5000,
+            });
+        }
+    };
+
     if (!course) {
         return (
             <div className="text-center py-12">
@@ -366,12 +397,13 @@ const CourseView = () => {
                                         {Math.round(numericProgress)}% complete
                                     </span>
                                 </div>
-                                <div className="w-full bg-blue-200 rounded-full h-3">
+                                <div className="w-full bg-blue-200 rounded-full h-3 mb-4">
                                     <div
                                         className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-700 shadow-sm"
                                         style={{ width: `${numericProgress}%` }}
                                     ></div>
                                 </div>
+
                             </div>
                         </div>
                         <div className="lg:w-80">
@@ -591,12 +623,10 @@ const CourseView = () => {
                                                 <div className="text-slate-500 text-sm">No resources available.</div>
                                             )}
                                             {(notesBucket?.data || []).map((note) => (
-                                                <a
+                                                <button
                                                     key={note.id}
-                                                    href={note.file_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="flex items-center p-3 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors"
+                                                    onClick={() => handleResourceDownload(note)}
+                                                    className="flex items-center w-full p-3 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors text-left"
                                                 >
                                                     <div className="bg-green-100 p-2 rounded-lg mr-2">
                                                         <FileText className="h-4 w-4 text-green-600" />
@@ -605,7 +635,10 @@ const CourseView = () => {
                                                         <p className="font-medium text-slate-900 text-sm">{getNoteDisplayName(note)}</p>
                                                         <p className="text-xs text-slate-500 break-all">{note.file_url}</p>
                                                     </div>
-                                                </a>
+                                                    <div className="bg-blue-100 p-2 rounded-lg">
+                                                        <Download className="h-4 w-4 text-blue-600" />
+                                                    </div>
+                                                </button>
                                             ))}
                                         </div>
                                     )}

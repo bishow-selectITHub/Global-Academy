@@ -20,11 +20,19 @@ const Login = () => {
 
   useEffect(() => {
     if (!userLoading && isAuthenticated) {
-      if (user?.role === "superadmin") {
-        navigate("/admin", { replace: true })
-      } else {
-        navigate("/dashboard", { replace: true })
+      // Navigate to appropriate dashboard based on role
+      const role = user?.role?.toLowerCase();
+      let redirectPath = '/';
+
+      if (role === 'superadmin' || role === 'admin' || role === 'manager') {
+        redirectPath = '/admin';
+      } else if (role === 'teacher') {
+        redirectPath = '/teacher';
+      } else if (role === 'learner') {
+        redirectPath = '/learner';
       }
+
+      navigate(redirectPath, { replace: true });
     }
   }, [userLoading, isAuthenticated, user, navigate])
 

@@ -136,6 +136,54 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     };
 
     fetchUser();
+
+    // Add auth state change listener to automatically update when user data changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 Auth state changed:', event, session ? 'Session exists' : 'No session');
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        if (session?.user) {
+          console.log('🔄 User data updated, refreshing user context...');
+          let role: UserRole = 'learner'; // Default role
+
+          if (session.user.user_metadata?.role) {
+            role = session.user.user_metadata.role as UserRole;
+          } else {
+            // Check the user_roles table as fallback
+            try {
+              const { data: roleData } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', session.user.id)
+                .single();
+
+              if (roleData?.role) {
+                role = roleData.role as UserRole;
+              }
+            } catch (error) {
+              console.log('Error fetching role from user_roles table:', error);
+            }
+          }
+
+          console.log(`🔄 Updated user with role: ${role}`);
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            role: role,
+            avatar: session.user.user_metadata?.avatar || '',
+            name: session.user.user_metadata?.name || ''
+          });
+        }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('🔄 User signed out, clearing user context');
+        setUser(null);
+      }
+    });
+
+    // Cleanup subscription
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -154,7 +202,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       const userId = signInData.user.id;
 
       // Fetch role from user_roles table
-      let role: UserRole = 'learner';
+      let role = ''
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
@@ -180,7 +228,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         navigate('/admin');
       } else if (role === 'teacher') {
         navigate('/teacher');
-      } else {
+      } else if (role === 'learner') {
         navigate('/dashboard');
       }
     } catch (error) {

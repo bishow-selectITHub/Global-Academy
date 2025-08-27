@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { Clock, DollarSign, Users, Calendar, BookOpen, Video, FileText, HelpCircle } from 'lucide-react';
 
+
 const lessonTypeIcon = (type: string) => {
     if (type === 'video') return <Video className="w-4 h-4 text-blue-500" />;
     if (type === 'text') return <FileText className="w-4 h-4 text-gray-500" />;
@@ -36,6 +37,8 @@ const CourseViewPage = () => {
         if (id) fetchCourse();
     }, [id]);
 
+
+
     if (isLoading) return (
         <div className="flex justify-center items-center h-64">
             <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -61,12 +64,15 @@ const CourseViewPage = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 py-8 px-2 md:px-8">
-            <button
-                className="mb-8 ml-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded shadow-sm"
-                onClick={() => navigate('/admin/courses')}
-            >
-                ← Back to Courses
-            </button>
+            <div className="flex gap-3 mb-8 ml-2">
+                <button
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded shadow-sm"
+                    onClick={() => navigate('/admin/courses')}
+                >
+                    ← Back to Courses
+                </button>
+
+            </div>
             <div className="w-full bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col lg:flex-row gap-0">
                 {/* Left: Image & Meta */}
                 <div className="flex-[1_1_0%] lg:basis-1/3 bg-gray-50 p-8 flex flex-col items-center border-b lg:border-b-0 lg:border-r border-gray-100 min-w-[320px]">

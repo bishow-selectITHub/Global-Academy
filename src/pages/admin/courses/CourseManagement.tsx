@@ -2,14 +2,17 @@
 
 import React, { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { Search, Plus, Filter, MoreVertical, Edit, Trash, Users, Clock, DollarSign, Play } from "lucide-react"
+import { Search, Plus, Filter, MoreVertical, Edit, Trash, Users, Clock, Play } from "lucide-react"
 import { useUser } from "../../../contexts/UserContext"
 import { useToast } from "../../../components/ui/Toaster"
 import { useDispatch, useSelector } from "react-redux"
 import type { RootState, AppDispatch } from "../../../store"
-import { fetchCourses, fetchCourseById } from "../../../store/coursesSlice"
+import { fetchCourses, fetchCourseById, deleteCourse } from "../../../store/coursesSlice"
 import { supabase } from "../../../lib/supabase"
 import HostLiveSession from "../live/HostLiveSession"
+
+
+import { FileText } from "lucide-react"
 
 const CourseManagement = () => {
   const dispatch = useDispatch<AppDispatch>()
@@ -29,6 +32,7 @@ const CourseManagement = () => {
     description: "",
   })
   const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ show: boolean; courseId: string | null; courseTitle: string }>({ show: false, courseId: null, courseTitle: '' });
 
   const handleLiveFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -73,76 +77,44 @@ const CourseManagement = () => {
   })
 
   const handleDeleteCourse = async (courseId: string) => {
-    if (!window.confirm("Are you sure you want to delete this course? This action cannot be undone.")) {
-      return
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this course? This action cannot be undone."
+      )
+    ) {
+      return;
     }
     setDeletingCourseId(courseId);
+
     try {
-      const { data: course, error: fetchError } = await supabase.from("courses").select("*").eq("id", courseId).single()
-      if (fetchError) throw fetchError
+      // 1. Delete quizzes linked to this course
+      const { error: quizzesDeleteError } = await supabase
+        .from("quizes")
+        .delete()
+        .eq("course_id", courseId);
+      if (quizzesDeleteError) throw quizzesDeleteError;
 
-      if (!course) {
-        if (typeof addToast === "function") {
-          addToast({
-            type: "error",
-            title: "Course not found",
-            message: "Could not retrieve course details for deletion.",
-            duration: 5000,
-          })
-        }
-        setDeletingCourseId(null);
-        return
-      }
-
-      const tryDeleteFromFolders = async (folders: string[], filename: string) => {
-        for (const folder of folders) {
-          try {
-            const { error: removeError } = await supabase.storage
-              .from("course-assets")
-              .remove([`${folder}/${filename}`])
-            if (removeError && removeError.message !== "The resource was not found") {
-              console.warn(`Warning: Could not delete ${filename} from ${folder}:`, removeError)
-            } else if (!removeError) {
-              console.log(`Successfully deleted ${filename} from ${folder}`)
-            }
-          } catch (e) {
-            console.warn(`Error trying to delete ${filename} from ${folder}:`, e)
-          }
-        }
-      }
-
-      if (course.thumbnail) {
-        const thumbnailFile = course.thumbnail.split("/").pop()
-        if (thumbnailFile) {
-          await tryDeleteFromFolders(["thumbnails", "thumbnail"], thumbnailFile)
-        }
-      }
-      if (course.instructor_avatar) {
-        const avatarFile = course.instructor_avatar.split("/").pop()
-        if (avatarFile) {
-          await tryDeleteFromFolders(["avatars", "instructor_avatar"], avatarFile)
-        }
-      }
-      if (Array.isArray(course.lessons)) {
-        for (const lesson of course.lessons) {
-          if (lesson.type === "video" && lesson.videoUrl) {
-            const videoFile = lesson.videoUrl.split("/").pop()
-            if (videoFile) {
-              await tryDeleteFromFolders(["lessons"], videoFile)
-            }
-          }
-        }
-      }
-
-      // Delete all enrollments for this course
+      // 2. Delete enrollments linked to this course
       const { error: enrollmentsDeleteError } = await supabase
         .from("course_enrollments")
         .delete()
         .eq("course_id", courseId);
       if (enrollmentsDeleteError) throw enrollmentsDeleteError;
 
-      // Delete the course from the database
-      const { error: deleteError } = await supabase.from("courses").delete().eq("id", courseId);
+      // 3. Delete live rooms linked to this course
+      const { error: liveRoomsDeleteError } = await supabase
+        .from("live_rooms")
+        .delete()
+        .eq("course_id", courseId);
+      if (liveRoomsDeleteError) {
+        console.warn("Warning: Could not delete live rooms:", liveRoomsDeleteError);
+      }
+
+      // 4. Finally delete the course itself
+      const { error: deleteError } = await supabase
+        .from("courses")
+        .delete()
+        .eq("id", courseId);
       if (deleteError) throw deleteError;
 
       if (typeof addToast === "function") {
@@ -150,20 +122,86 @@ const CourseManagement = () => {
           type: "success",
           title: "Course deleted successfully",
           duration: 5000,
-        })
+        });
       }
 
-      dispatch(fetchCourses())
+      // Refresh state
+      dispatch(fetchCourses());
     } catch (error: any) {
-      console.error("Error deleting course:", error)
+      console.error("Error deleting course:", error);
       if (typeof addToast === "function") {
         addToast({
           type: "error",
           title: "Error deleting course",
           message: error.message || "Please try again later.",
           duration: 5000,
-        })
+        });
       }
+    } finally {
+      setDeletingCourseId(null);
+    }
+  };
+
+  const confirmDeleteCourse = (courseId: string, courseTitle: string) => {
+    setDeleteConfirmation({
+      show: true,
+      courseId,
+      courseTitle
+    });
+  }
+
+  const executeDeleteCourse = async () => {
+    if (!deleteConfirmation.courseId) return;
+
+    setDeleteConfirmation({ show: false, courseId: null, courseTitle: '' });
+    setDeletingCourseId(deleteConfirmation.courseId);
+
+    try {
+      // 1. Delete quizzes linked to this course
+      const { error: quizzesDeleteError } = await supabase
+        .from("quizes")
+        .delete()
+        .eq("course_id", deleteConfirmation.courseId);
+      if (quizzesDeleteError) throw quizzesDeleteError;
+
+      // 2. Delete enrollments linked to this course
+      const { error: enrollmentsDeleteError } = await supabase
+        .from("course_enrollments")
+        .delete()
+        .eq("course_id", deleteConfirmation.courseId);
+      if (enrollmentsDeleteError) throw enrollmentsDeleteError;
+
+      // 3. Delete live rooms linked to this course
+      const { error: liveRoomsDeleteError } = await supabase
+        .from("live_rooms")
+        .delete()
+        .eq("course_id", deleteConfirmation.courseId);
+      if (liveRoomsDeleteError) {
+        console.warn("Warning: Could not delete live rooms:", liveRoomsDeleteError);
+      }
+
+      // 4. Use Redux deleteCourse action which will automatically update the store
+      const result = await dispatch(deleteCourse(deleteConfirmation.courseId));
+
+      if (deleteCourse.fulfilled.match(result)) {
+        addToast({
+          type: "success",
+          title: "Course deleted successfully",
+          message: `"${deleteConfirmation.courseTitle}" has been permanently removed.`,
+          duration: 5000,
+        });
+      } else {
+        throw new Error("Failed to delete course");
+      }
+
+    } catch (error: any) {
+      console.error("Error deleting course:", error);
+      addToast({
+        type: "error",
+        title: "Error deleting course",
+        message: error.message || "Please try again later.",
+        duration: 5000,
+      });
     } finally {
       setDeletingCourseId(null);
     }
@@ -192,12 +230,15 @@ const CourseManagement = () => {
   if (id && courseDetails) {
     return (
       <div className="w-full max-w-5xl mx-auto px-4 py-8">
-        <button
-          className="mb-4 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm transition-colors"
-          onClick={() => navigate("/admin/courses")}
-        >
-          ← Back to Courses
-        </button>
+        <div className="flex gap-3 mb-4">
+          <button
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm transition-colors"
+            onClick={() => navigate("/admin/courses")}
+          >
+            ← Back to Courses
+          </button>
+
+        </div>
         <div className="bg-white rounded-lg shadow p-6 flex flex-col md:flex-row gap-6 w-full">
           <div className="flex-shrink-0 w-full md:w-72">
             <img
@@ -220,7 +261,7 @@ const CourseManagement = () => {
               <span className="font-medium">Duration:</span> {courseDetails.duration}
             </div>
             <div className="mb-1 text-sm text-gray-700">
-              <span className="font-medium">Price:</span> {courseDetails.price ? `$${courseDetails.price}` : "Free"}
+              <span className="font-medium">Level:</span> {courseDetails.level || "N/A"}
             </div>
             <div className="mb-1 text-sm text-gray-700">
               <span className="font-medium">Enrolled:</span> {courseDetails.enrollments?.[0]?.count || 0}
@@ -391,10 +432,11 @@ const CourseManagement = () => {
                     </button>
                     {openMenuId === course.id && (
                       <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded shadow-lg py-1 z-10 card-menu">
+
                         <button
                           onClick={() => {
                             setOpenMenuId(null)
-                            handleDeleteCourse(course.id)
+                            confirmDeleteCourse(course.id, course.title)
                           }}
                           className="flex items-center w-full px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors"
                           disabled={deletingCourseId === course.id}
@@ -402,7 +444,7 @@ const CourseManagement = () => {
                           {deletingCourseId === course.id ? (
                             <span className="flex items-center gap-1"><span className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600"></span> Deleting...</span>
                           ) : (
-                            <><Trash className="h-3 w-3 mr-2" /> Delete</>
+                            <><Trash className="w-3 h-3 mr-2" /> Delete</>
                           )}
                         </button>
                       </div>
@@ -441,8 +483,8 @@ const CourseManagement = () => {
                       <span>{course.duration || "N/A"}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <DollarSign className="w-3 h-3" />
-                      <span>{course.price ? `$${course.price}` : "Free"}</span>
+                      <Clock className="w-3 h-3" />
+                      <span>{course.level || "N/A"}</span>
                     </div>
                   </div>
 
@@ -495,6 +537,57 @@ const CourseManagement = () => {
             </div>
           )}
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirmation.show && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <div className="flex items-center mb-4">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                  <Trash className="w-5 h-5 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Course</h3>
+              </div>
+
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete <span className="font-semibold text-gray-900">"{deleteConfirmation.courseTitle}"</span>?
+              </p>
+
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <h4 className="font-medium text-red-800 mb-2">This action will:</h4>
+                <ul className="text-sm text-red-700 space-y-1">
+                  <li>• Remove all course data permanently</li>
+                  <li>• Delete all student enrollments</li>
+                  <li>• Remove course assets and files</li>
+                  <li>• This action cannot be undone</li>
+                </ul>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirmation({ show: false, courseId: null, courseTitle: '' })}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeDeleteCourse}
+                  disabled={deletingCourseId === deleteConfirmation.courseId}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:bg-red-400 disabled:cursor-not-allowed"
+                >
+                  {deletingCourseId === deleteConfirmation.courseId ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                      Deleting...
+                    </span>
+                  ) : (
+                    'Delete Course'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

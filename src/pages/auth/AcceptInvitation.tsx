@@ -51,7 +51,16 @@ const AcceptInvitation = () => {
             setEmailFromSession(s?.user?.email || invitedEmail);
             const md = s?.user?.user_metadata || {};
             setNameFromSession(md.name || invitedName || '');
-            setRoleFromSession(((md.role as string) || invitedRole || 'admin').toLowerCase());
+            const extractedRole = ((md.role as string) || invitedRole || 'admin').toLowerCase();
+            setRoleFromSession(extractedRole);
+
+            console.log('🔍 [DEBUG] populateFromSession:', {
+                sessionUser: s?.user?.email,
+                metadata: md,
+                extractedRole,
+                invitedRole,
+                finalRole: extractedRole
+            });
         };
 
         const init = async () => {
@@ -137,6 +146,14 @@ const AcceptInvitation = () => {
             const userId = userData.user.id;
             const email = userData.user.email || invitedEmail;
 
+            console.log('🔍 [DEBUG] Accepting invitation with:', {
+                userId,
+                email,
+                invitedRole,
+                roleFromSession,
+                nameFromSession: nameFromSession || invitedName
+            });
+
             // 2. Update password + metadata in one go
             const { error: updateErr } = await supabase.auth.updateUser({
                 password,
@@ -146,6 +163,8 @@ const AcceptInvitation = () => {
                 },
             });
             if (updateErr) throw updateErr;
+
+            console.log('✅ [DEBUG] User metadata updated with role:', roleFromSession);
 
             // 3. Upsert profile row
             const profilePayload = {
@@ -166,19 +185,39 @@ const AcceptInvitation = () => {
             if (checkErr) throw checkErr;
 
             if (!existingRole) {
+                console.log('📝 [DEBUG] Inserting role into user_roles table:', { userId, role: roleFromSession });
                 const { error: roleErr } = await supabase.from('user_roles').insert([{ user_id: userId, role: roleFromSession }]);
                 if (roleErr) throw roleErr;
+                console.log('✅ [DEBUG] Role inserted into user_roles table');
+            } else {
+                console.log('ℹ️ [DEBUG] Role already exists in user_roles table');
             }
 
             // 5. Re-login explicitly with email/password
             if (email) {
+                console.log('🔄 [DEBUG] Re-logging in to refresh session...');
                 await supabase.auth.signOut();
                 const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
                 if (signInErr) throw signInErr;
+                console.log('✅ [DEBUG] Re-login successful');
             }
 
             addToast({ type: 'success', title: 'Invitation accepted', message: 'Your account is ready.' });
-            navigate('/admin', { replace: true });
+
+            // Navigate based on the actual role that was set
+            const finalRole = roleFromSession.toLowerCase();
+            let redirectPath = '/';
+
+            if (finalRole === 'superadmin' || finalRole === 'admin' || finalRole === 'manager') {
+                redirectPath = '/admin';
+            } else if (finalRole === 'teacher') {
+                redirectPath = '/teacher';
+            } else {
+                redirectPath = '/learner';
+            }
+
+            console.log(`🎯 Redirecting to ${redirectPath} based on role: ${finalRole}`);
+            navigate(redirectPath, { replace: true });
         } catch (err: any) {
             addToast({ type: 'error', title: 'Could not accept invitation', message: err?.message || 'Try again.' });
         } finally {
@@ -238,5 +277,3 @@ const AcceptInvitation = () => {
 };
 
 export default AcceptInvitation;
-
-

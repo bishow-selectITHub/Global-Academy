@@ -60,6 +60,7 @@ import About from "./pages/landing/About"
 import Contact from "./pages/landing/Contact"
 import TeacherCourses from "./pages/teacher/courses/TeacherCourses"
 import TeacherAttendance from "./pages/teacher/attendance"
+import PdfDownloadButton from "./components/pdf-download-button"
 
 function Prefetcher() {
   const dispatch = useDispatch<AppDispatch>()
@@ -137,6 +138,7 @@ function App() {
                 <Route path="/admin/courses/:courseId/lessons/:lessonId" element={<LessonEditor />} />
                 <Route path="/admin/quizzes" element={<QuizManagement />} />
                 <Route path="/admin/courses/:courseId/quiz" element={<QuizBuilder />} />
+                <Route path="/admin/pdf" element={<PdfDownloadButton />} />
                 <Route path="/admin/certificates" element={<CertificateTemplates />} />
                 <Route path="/admin/users" element={<UserManagement />} />
                 <Route path="/admin/assets" element={<AssetManagement />} />

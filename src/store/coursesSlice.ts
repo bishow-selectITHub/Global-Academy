@@ -33,7 +33,7 @@ interface CourseState {
 }
 
 export const fetchCourses = createAsyncThunk<
-    Course[],
+    Course[] | null,
     void,
     { state: RootState; rejectValue: string }
 >(
@@ -222,6 +222,8 @@ const coursesSlice = createSlice({
             .addCase(createCourse.fulfilled, (state, action) => {
                 state.loading = false;
                 state.data.push(action.payload);
+                // Also update the byId index for consistency
+                state.byId[action.payload.id] = action.payload;
             })
             .addCase(createCourse.rejected, (state, action) => {
                 state.loading = false;
@@ -238,6 +240,8 @@ const coursesSlice = createSlice({
                 if (index !== -1) {
                     state.data[index] = action.payload;
                 }
+                // Also update the byId index for consistency
+                state.byId[action.payload.id] = action.payload;
                 if (state.currentCourse?.id === action.payload.id) {
                     state.currentCourse = action.payload;
                 }
@@ -254,6 +258,8 @@ const coursesSlice = createSlice({
             .addCase(deleteCourse.fulfilled, (state, action) => {
                 state.loading = false;
                 state.data = state.data.filter(course => course.id !== action.payload);
+                // Also remove from the byId index for consistency
+                delete state.byId[action.payload];
                 if (state.currentCourse?.id === action.payload) {
                     state.currentCourse = null;
                 }
