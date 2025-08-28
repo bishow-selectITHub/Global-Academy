@@ -38,6 +38,7 @@ import CertificateTemplates from "./pages/admin/certificates/CertificateTemplate
 import UserManagement from "./pages/admin/users/UserManagement"
 import AssetManagement from "./pages/admin/assets/AssetManagement"
 import AnalyticsDashboard from "./pages/admin/analytics/AnalyticsDashboard"
+import AdminMeetings from "./pages/admin/meetings"
 
 // Learner Pages
 import LearnerDashboard from "./pages/learner/Dashboard"
@@ -143,6 +144,7 @@ function App() {
                 <Route path="/admin/users" element={<UserManagement />} />
                 <Route path="/admin/assets" element={<AssetManagement />} />
                 <Route path="/admin/analytics" element={<AnalyticsDashboard />} />
+                <Route path="/admin/meetings" element={<AdminMeetings />} />
               </Route>
 
               {/* Teacher Routes */}

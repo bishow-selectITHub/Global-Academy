@@ -212,8 +212,8 @@ const AcceptInvitation = () => {
                 redirectPath = '/admin';
             } else if (finalRole === 'teacher') {
                 redirectPath = '/teacher';
-            } else {
-                redirectPath = '/learner';
+            } else if (finalRole === 'learner') {
+                redirectPath = '/dashboard';
             }
 
             console.log(`🎯 Redirecting to ${redirectPath} based on role: ${finalRole}`);

@@ -15,7 +15,8 @@ import {
   Moon,
   Sun,
   PieChart,
-  Home
+  Home,
+  Video
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import GlobalSearch from '../components/global/GlobalSearch';
@@ -32,11 +33,14 @@ const AdminLayout = () => {
   const navItems = [
     { path: '/admin', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { path: '/admin/courses', label: 'Courses', icon: <BookOpen size={20} /> },
+    { path: '/admin/meetings', label: 'Meetings', icon: <Video size={20} /> },
     { path: '/admin/quizzes', label: 'Quizzes', icon: <Clipboard size={20} /> },
+
     { path: '/admin/certificates', label: 'Certificates', icon: <Award size={20} /> },
     { path: '/admin/users', label: 'Users', icon: <Users size={20} /> },
     { path: '/admin/assets', label: 'Assets', icon: <Package size={20} /> },
     { path: '/admin/analytics', label: 'Analytics', icon: <PieChart size={20} /> },
+
   ];
 
   const isActive = (path: string) => {

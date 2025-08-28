@@ -5,7 +5,7 @@ export default function Home() {
     return (
         <div className="bg-white">
             {/* Hero Section */}
-            <section className="relative bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 py-12 sm:py-16 lg:py-24 overflow-hidden">
+            <section className="relative bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 py-6 sm:py-6 lg:py-6 overflow-hidden">
                 <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">

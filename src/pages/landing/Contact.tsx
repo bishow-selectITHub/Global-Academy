@@ -30,7 +30,7 @@ export default function Contact() {
     }
 
     return (
-        <div className="bg-gradient-to-br from-slate-50 via-blue-50/30 to-white py-16 sm:py-20 lg:py-32">
+        <div className="bg-gradient-to-br from-slate-50 via-blue-50/30 to-white py-6 sm:py-6 lg:py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
                 <div className="text-center mb-16 sm:mb-20 lg:mb-24">

@@ -1,6 +1,6 @@
 import { generate } from '@pdfme/generator';
 import { text, image, rectangle, ellipse, checkbox, line } from '@pdfme/schemas';
-import template from '../../public/templates/template2.json' assert { type: 'json' }
+import template from '/templates/template2.json?url' assert { type: 'json' }
 import urlToBase64 from './urlToBase64';
 
 export const generatePDF = async (data: Record<string, any>) => {

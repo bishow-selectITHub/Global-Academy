@@ -96,7 +96,7 @@ export default function Pricing() {
     ]
 
     return (
-        <div className="bg-gradient-to-br from-blue-50 via-white to-slate-50 py-12 sm:py-16 lg:py-24">
+        <div className="bg-gradient-to-br from-blue-50 via-white to-slate-50 py-6 sm:py-6 lg:py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
                 <div className="text-center mb-12 sm:mb-16 lg:mb-20">

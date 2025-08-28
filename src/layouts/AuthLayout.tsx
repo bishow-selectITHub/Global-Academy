@@ -19,7 +19,7 @@ const AuthLayout = () => {
     } else if (role === 'teacher') {
       redirectPath = '/teacher';
     } else if (role === 'learner') {
-      redirectPath = '/learner';
+      redirectPath = '/dashboard';
     }
 
     return <Navigate to={redirectPath} replace />
