@@ -97,13 +97,10 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const updateUserFromSession = useCallback(
     async (sessionUser: any, skipCache = false) => {
       try {
-        console.log("🔄 Updating user from session:", sessionUser.id)
-
         // Check cache first unless explicitly skipping
         if (!skipCache) {
           const cachedUser = getCachedUser()
           if (cachedUser && cachedUser.id === sessionUser.id) {
-            console.log("✅ Using cached user data")
             setUser(cachedUser)
             dispatch(setUserInStore(cachedUser))
             setIsLoading(false)
@@ -116,10 +113,8 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         // Try metadata first (fastest)
         if (sessionUser.user_metadata?.role) {
           role = sessionUser.user_metadata.role as UserRole
-          console.log("✅ Role found in metadata:", role)
         } else {
           // Only query database if role not in metadata
-          console.log("🔍 Fetching role from database...")
           try {
             const { data: roleData, error } = await supabase
               .from("user_roles")
@@ -131,10 +126,9 @@ export const UserProvider = ({ children }: UserProviderProps) => {
 
             if (roleData?.role) {
               role = roleData.role as UserRole
-              console.log("✅ Role found in database:", role)
             }
           } catch (error) {
-            console.log("⚠️ Error fetching role, using default 'learner':", error)
+            // Use default 'learner' role on error
           }
         }
 
@@ -146,13 +140,12 @@ export const UserProvider = ({ children }: UserProviderProps) => {
           name: sessionUser.user_metadata?.name || "",
         }
 
-        console.log("✅ Setting user object:", userObj)
         setUser(userObj)
         dispatch(setUserInStore(userObj))
         setCachedUser(userObj) // Cache for next time
         setIsLoading(false)
       } catch (error) {
-        console.error("❌ Error in updateUserFromSession:", error)
+        console.error("Error in updateUserFromSession:", error)
         setIsLoading(false)
       }
     },
@@ -163,30 +156,25 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     let mounted = true
 
     const init = async () => {
-      console.log("🚀 Initializing UserContext...")
-
       const cachedUser = getCachedUser()
       if (cachedUser) {
-        console.log("🔑 Found cached user, validating session...")
         try {
           const {
             data: { session },
             error,
           } = await supabase.auth.getSession()
           if (session?.user && session.user.id === cachedUser.id) {
-            console.log("✅ Session valid, using cached user")
             setUser(cachedUser)
             dispatch(setUserInStore(cachedUser))
             setIsLoading(false)
             return
           } else {
-            console.log("❌ Session invalid, clearing cache")
             setCachedUser(null)
             setUser(null)
             dispatch(setUserInStore(null))
           }
         } catch (err) {
-          console.error("💥 Error validating session:", err)
+          console.error("Error validating session:", err)
           setCachedUser(null)
         }
       }
@@ -199,23 +187,21 @@ export const UserProvider = ({ children }: UserProviderProps) => {
           error,
         } = await supabase.auth.getSession()
         if (error) {
-          console.error("❌ Error fetching session:", error)
+          console.error("Error fetching session:", error)
           if (mounted) setIsLoading(false)
           return
         }
 
         if (session?.user) {
-          console.log("🔑 Found session, updating user...")
           await updateUserFromSession(session.user, true) // Skip cache check since we just validated
         } else {
-          console.log("🚫 No session found")
           setUser(null)
           dispatch(setUserInStore(null))
           setCachedUser(null)
           if (mounted) setIsLoading(false)
         }
       } catch (err) {
-        console.error("💥 Error getting session:", err)
+        console.error("Error getting session:", err)
         if (mounted) setIsLoading(false)
       }
     }
@@ -225,13 +211,13 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔄 Auth state changed:", event)
-
       if (event === "SIGNED_IN" && session?.user) {
-        console.log("✅ User signed in")
-        await updateUserFromSession(session.user, true)
+        // Only update if this is a different user or we don't have a user cached
+        const currentUser = getCachedUser()
+        if (!currentUser || currentUser.id !== session.user.id) {
+          await updateUserFromSession(session.user, true)
+        }
       } else if (event === "SIGNED_OUT") {
-        console.log("🔄 User signed out, clearing context")
         setUser(null)
         dispatch(setUserInStore(null))
         setCachedUser(null)
@@ -248,7 +234,6 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const login = useCallback(
     async (email: string, password: string) => {
       try {
-        console.log("🔐 Attempting login for:", email)
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -257,8 +242,6 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         if (signInError || !signInData.session) {
           throw signInError || new Error("Login failed")
         }
-
-        console.log("✅ Login successful")
 
         await updateUserFromSession(signInData.user, true)
 
@@ -271,7 +254,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
           navigate("/dashboard")
         }
       } catch (error) {
-        console.error("❌ Login error:", error)
+        console.error("Login error:", error)
         throw error
       }
     },

@@ -6,8 +6,7 @@ interface Enrollment {
     id: string
     user_id: string
     course_id: string
-    lessons?: any[] // full lesson array (optional)
-    completed_lessons?: string[] // ✅ NEW: track completed lesson IDs
+    lessons?: any[] // full lesson array with completion status
     progress?: number
     created_at?: string
     updated_at?: string
@@ -72,14 +71,13 @@ export const updateEnrollment = createAsyncThunk<
     { rejectValue: string }
 >("enrollments/updateEnrollment", async ({ userId, courseId, lessons, progress }, { rejectWithValue }) => {
     try {
-        // Extract only completed lesson IDs
-        const completedLessons = lessons.filter((l) => l.completed === true).map((l) => l.id)
+        console.log("[v0] Updating enrollment:", { userId, courseId, lessonsCount: lessons.length, progress })
+        console.log("[v0] Full lessons array:", lessons)
 
         const { data, error } = await supabase
             .from("course_enrollments")
             .update({
-                lessons, // store full lessons array if needed
-                completed_lessons: completedLessons, // ✅ NEW: explicit list of completed lessons
+                lessons: lessons, // Full lesson objects with all properties and completion status
                 progress,
                 updated_at: new Date().toISOString(),
             })
@@ -88,9 +86,15 @@ export const updateEnrollment = createAsyncThunk<
             .select("*, course:courses(*)")
             .single()
 
-        if (error) throw error
+        if (error) {
+            console.error("[v0] Supabase update error:", error)
+            throw error
+        }
+
+        console.log("[v0] Supabase update successful:", data)
         return data as Enrollment
     } catch (err: any) {
+        console.error("[v0] Update enrollment failed:", err)
         return rejectWithValue(err.message)
     }
 })
