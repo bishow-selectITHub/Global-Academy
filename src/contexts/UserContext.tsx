@@ -1,330 +1,399 @@
-import { useState, useEffect, createContext, useContext, ReactNode, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { useToast } from '../components/ui/Toaster';
-import { useDispatch } from 'react-redux';
-import { rootLogout } from '../store/index';
+"use client"
 
-export type UserRole = 'superadmin' | 'learner' | 'admin' | 'manager' | 'teacher';
+import { useState, useEffect, createContext, useContext, type ReactNode, useMemo, useCallback } from "react"
+import { useNavigate } from "react-router-dom"
+import { supabase } from "../lib/supabase"
+import { useToast } from "../components/ui/Toaster"
+import { useDispatch } from "react-redux"
+import { rootLogout } from "../store/index"
+import { setUserInStore } from "../store/userSlice"
+
+export type UserRole = "superadmin" | "learner" | "admin" | "manager" | "teacher"
 
 export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
-  role: UserRole;
+  id: string
+  name: string
+  email: string
+  avatar: string
+  role: UserRole
 }
 
 interface UserContextType {
-  user: User | null;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  user: User | null
+  isLoading: boolean
+  login: (email: string, password: string) => Promise<void>
+  logout: () => Promise<void>
   register: (
     name: string,
     email: string,
     password: string,
     extras?: {
-      registrationNo?: string;
-      companyName?: string;
-      domain?: string;
-      companyStamp?: string;
-      companyDoc?: string;
-      phone?: string;
-      location?: string;
-    }
-  ) => Promise<void>;
-  isAuthenticated: boolean;
-  isAdmin: boolean;
+      registrationNo?: string
+      companyName?: string
+      domain?: string
+      companyStamp?: string
+      companyDoc?: string
+      phone?: string
+      location?: string
+    },
+  ) => Promise<void>
+  isAuthenticated: boolean
+  isAdmin: boolean
 }
 
-const UserContext = createContext<UserContextType | undefined>(undefined);
+const UserContext = createContext<UserContextType | undefined>(undefined)
 
 export const useUser = () => {
-  const context = useContext(UserContext);
+  const context = useContext(UserContext)
   if (context === undefined) {
-    throw new Error('useUser must be used within a UserProvider');
+    throw new Error("useUser must be used within a UserProvider")
   }
-  return context;
-};
+  return context
+}
 
 interface UserProviderProps {
-  children: ReactNode;
+  children: ReactNode
+}
+
+const CACHE_KEY = "issuelearner_user"
+const CACHE_EXPIRY = 24 * 60 * 60 * 1000 // 24 hours
+
+const getCachedUser = (): User | null => {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY)
+    if (!cached) return null
+
+    const { user, timestamp } = JSON.parse(cached)
+    if (Date.now() - timestamp > CACHE_EXPIRY) {
+      localStorage.removeItem(CACHE_KEY)
+      return null
+    }
+
+    return user
+  } catch {
+    return null
+  }
+}
+
+const setCachedUser = (user: User | null) => {
+  try {
+    if (user) {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ user, timestamp: Date.now() }))
+    } else {
+      localStorage.removeItem(CACHE_KEY)
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
 }
 
 export const UserProvider = ({ children }: UserProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
-  const { addToast } = useToast();
-  const dispatch = useDispatch();
+  const [user, setUser] = useState<User | null>(getCachedUser())
+  const [isLoading, setIsLoading] = useState(!getCachedUser()) // Don't show loading if we have cached user
+  const navigate = useNavigate()
+  const { addToast } = useToast()
+  const dispatch = useDispatch()
+
+  const updateUserFromSession = useCallback(
+    async (sessionUser: any, skipCache = false) => {
+      try {
+        // Check cache first unless explicitly skipping
+        if (!skipCache) {
+          const cachedUser = getCachedUser()
+          if (cachedUser && cachedUser.id === sessionUser.id) {
+            setUser(cachedUser)
+            dispatch(setUserInStore(cachedUser))
+            setIsLoading(false)
+            return
+          }
+        }
+
+        let role: UserRole = "learner"
+
+        // Try metadata first (fastest)
+        if (sessionUser.user_metadata?.role) {
+          role = sessionUser.user_metadata.role as UserRole
+        } else {
+          // Only query database if role not in metadata
+          try {
+            const { data: roleData, error } = await supabase
+              .from("user_roles")
+              .select("role")
+              .eq("user_id", sessionUser.id)
+              .single()
+
+            if (error) throw error
+
+            if (roleData?.role) {
+              role = roleData.role as UserRole
+            }
+          } catch (error) {
+            // Use default 'learner' role on error
+          }
+        }
+
+        const userObj: User = {
+          id: sessionUser.id,
+          email: sessionUser.email || "",
+          role,
+          avatar: sessionUser.user_metadata?.avatar || "",
+          name: sessionUser.user_metadata?.name || "",
+        }
+
+        setUser(userObj)
+        dispatch(setUserInStore(userObj))
+        setCachedUser(userObj) // Cache for next time
+        setIsLoading(false)
+      } catch (error) {
+        console.error("Error in updateUserFromSession:", error)
+        setIsLoading(false)
+      }
+    },
+    [dispatch],
+  )
 
   useEffect(() => {
-    const fetchUser = async () => {
-      setIsLoading(true);
-      console.log('🔍 UserContext: Starting user fetch...');
+    let mounted = true
 
-      // 🚨 TEMPORARY: Force clear session for testing
-      const currentPath = window.location.pathname;
-      if (currentPath === '/' || currentPath.startsWith('/features') || currentPath.startsWith('/pricing') ||
-        currentPath.startsWith('/testimonials') || currentPath.startsWith('/about') || currentPath.startsWith('/contact')) {
-        console.log('🧹 On landing page - checking for force session clear...');
-        // Only clear if explicitly requested (you can add a query param like ?clear=true)
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('clear') === 'true') {
-          console.log('🧹 Force clearing session...');
-          await supabase.auth.signOut();
-          window.history.replaceState({}, document.title, window.location.pathname);
+    const init = async () => {
+      const cachedUser = getCachedUser()
+      if (cachedUser) {
+        try {
+          const {
+            data: { session },
+            error,
+          } = await supabase.auth.getSession()
+          if (session?.user && session.user.id === cachedUser.id) {
+            setUser(cachedUser)
+            dispatch(setUserInStore(cachedUser))
+            setIsLoading(false)
+            return
+          } else {
+            setCachedUser(null)
+            setUser(null)
+            dispatch(setUserInStore(null))
+          }
+        } catch (err) {
+          console.error("Error validating session:", err)
+          setCachedUser(null)
         }
       }
 
+      // Full session check if no valid cache
+      setIsLoading(true)
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          console.error('❌ Error fetching session:', sessionError);
-          setIsLoading(false);
-          return;
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+        if (error) {
+          console.error("Error fetching session:", error)
+          if (mounted) setIsLoading(false)
+          return
         }
 
-        console.log('📊 Session data:', sessionData?.session ? 'Session exists' : 'No session');
-
-        if (sessionData?.session) {
-          console.log('🔑 Found existing session, fetching user data...');
-          const { data: userData } = await supabase.auth.getUser();
-
-          if (userData?.user) {
-            let role: UserRole = 'learner'; // Default role
-
-            if (userData.user.user_metadata?.role) {
-              role = userData.user.user_metadata.role as UserRole;
-            } else {
-              // Check the user_roles table as fallback
-              try {
-                const { data: roleData } = await supabase
-                  .from('user_roles')
-                  .select('role')
-                  .eq('user_id', userData.user.id)
-                  .single();
-
-                if (roleData?.role) {
-                  role = roleData.role as UserRole;
-                }
-              } catch (error) {
-                console.log('Error fetching role from user_roles table:', error);
-              }
-            }
-
-            console.log(`👤 Setting user with role: ${role}`);
-            setUser({
-              id: userData.user.id,
-              email: userData.user.email || '',
-              role: role,
-              avatar: userData.user.user_metadata?.avatar || '',
-              name: userData.user.user_metadata?.name || ''
-            });
-          }
+        if (session?.user) {
+          await updateUserFromSession(session.user, true) // Skip cache check since we just validated
         } else {
-          console.log('🚫 No session found, user will remain null');
+          setUser(null)
+          dispatch(setUserInStore(null))
+          setCachedUser(null)
+          if (mounted) setIsLoading(false)
         }
       } catch (err) {
-        console.error('💥 Error in fetchUser:', err);
-      } finally {
-        setIsLoading(false);
-        console.log('✅ UserContext: User fetch completed');
+        console.error("Error getting session:", err)
+        if (mounted) setIsLoading(false)
       }
-    };
-
-    fetchUser();
-  }, []);
-
-  const login = useCallback(async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      // Sign in with Supabase
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError || !signInData.session) {
-        throw signInError || new Error('Login failed');
-      }
-
-      const userId = signInData.user.id;
-
-      // Fetch role from user_roles table
-      let role: UserRole = 'learner';
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .single();
-
-      if (roleError) {
-        console.warn('Could not fetch user role, defaulting to learner:', roleError.message);
-      } else if (roleData?.role) {
-        role = roleData.role as UserRole;
-      }
-
-      setUser({
-        id: userId,
-        name: signInData.user.user_metadata?.name || '',
-        email: signInData.user.email || '',
-        role,
-        avatar: signInData.user.user_metadata?.avatar || '',
-      });
-
-      // Navigate based on role
-      if (role === 'superadmin' || role === 'admin' || role === 'manager') {
-        navigate('/admin');
-      } else if (role === 'teacher') {
-        navigate('/teacher');
-      } else {
-        navigate('/dashboard');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
     }
-  }, [navigate]);
+
+    init()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        // Only update if this is a different user or we don't have a user cached
+        const currentUser = getCachedUser()
+        if (!currentUser || currentUser.id !== session.user.id) {
+          await updateUserFromSession(session.user, true)
+        }
+      } else if (event === "SIGNED_OUT") {
+        setUser(null)
+        dispatch(setUserInStore(null))
+        setCachedUser(null)
+        if (mounted) setIsLoading(false)
+      }
+    })
+
+    return () => {
+      mounted = false
+      subscription?.unsubscribe()
+    }
+  }, [dispatch, updateUserFromSession])
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      try {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+
+        if (signInError || !signInData.session) {
+          throw signInError || new Error("Login failed")
+        }
+
+        await updateUserFromSession(signInData.user, true)
+
+        const userRole = signInData.user.user_metadata?.role
+        if (userRole === "superadmin" || userRole === "admin" || userRole === "manager") {
+          navigate("/admin")
+        } else if (userRole === "teacher") {
+          navigate("/teacher")
+        } else {
+          navigate("/dashboard")
+        }
+      } catch (error) {
+        console.error("Login error:", error)
+        throw error
+      }
+    },
+    [navigate, updateUserFromSession],
+  )
 
   const logout = useCallback(async () => {
     try {
-      // Optimistic logout - clear user state immediately
-      setUser(null);
-      dispatch(rootLogout()); // Clear all Redux state
+      setUser(null)
+      dispatch(setUserInStore(null))
+      dispatch(rootLogout())
+      setCachedUser(null)
 
-      // Navigate immediately for better UX
-      navigate('/');
+      navigate("/")
 
-      // Sign out from Supabase in background
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut()
       if (error) {
-        console.error('Sign out error:', error);
+        console.error("Sign out error:", error)
         addToast({
           title: "Error signing out",
           message: error.message,
-          type: "error"
-        });
-        return;
+          type: "error",
+        })
+        return
       }
 
       addToast({
         title: "Signed out successfully",
-        message: 'You have been logged out',
-        type: 'success'
-      });
+        message: "You have been logged out",
+        type: "success",
+      })
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error("Sign out error:", error)
       addToast({
         title: "Logout error",
         message: "An error occurred during logout",
-        type: "error"
-      });
+        type: "error",
+      })
     }
-  }, [addToast, navigate, dispatch]);
+  }, [addToast, navigate, dispatch])
 
-  const register = useCallback(async (
-    name: string,
-    email: string,
-    password: string,
-    extras?: {
-      registrationNo?: string;
-      companyName?: string;
-      domain?: string;
-      companyStamp?: string;
-      companyDoc?: string;
-      phone?: string;
-      location?: string;
-    }
-  ) => {
-    setIsLoading(true);
-    try {
-      // Sign up with Supabase (store name in user_metadata)
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            role: 'superadmin',
-            registrationNo: extras?.registrationNo || '',
-            companyName: extras?.companyName || '',
-            domain: extras?.domain || '',
-            companyStamp: extras?.companyStamp || '',
-            companyDoc: extras?.companyDoc || '',
-            phone: extras?.phone || '',
-            location: extras?.location || ''
-          }
+  const register = useCallback(
+    async (
+      name: string,
+      email: string,
+      password: string,
+      extras?: {
+        registrationNo?: string
+        companyName?: string
+        domain?: string
+        companyStamp?: string
+        companyDoc?: string
+        phone?: string
+        location?: string
+      },
+    ) => {
+      setIsLoading(true)
+      try {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              name,
+              role: "superadmin",
+              registrationNo: extras?.registrationNo || "",
+              companyName: extras?.companyName || "",
+              domain: extras?.domain || "",
+              companyStamp: extras?.companyStamp || "",
+              companyDoc: extras?.companyDoc || "",
+              phone: extras?.phone || "",
+              location: extras?.location || "",
+            },
+          },
+        })
+
+        if (signUpError || !signUpData.user) {
+          throw signUpError || new Error("Registration failed")
         }
-      });
 
-      if (signUpError || !signUpData.user) {
-        throw signUpError || new Error('Registration failed');
-      }
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .insert([{ user_id: signUpData.user.id, role: "superadmin" }])
 
-      // Insert role into user_roles table
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert([{ user_id: signUpData.user.id, role: 'superadmin' }]);
+        if (roleError) {
+          throw roleError
+        }
 
-      if (roleError) {
-        throw roleError;
-      }
-
-      // Create a profile entry in the 'users' table
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert({
+        const { error: profileError } = await supabase.from("users").insert({
           id: signUpData.user.id,
           name: name,
           email: email,
-          phone: extras?.phone || '',
-          location: extras?.location || '',
+          phone: extras?.phone || "",
+          location: extras?.location || "",
+          registrationNo: extras?.registrationNo || "",
+          companyName: extras?.companyName || "",
+          domain: extras?.domain || "",
+          companyStamp: extras?.companyStamp || "",
+          companyDoc: extras?.companyDoc || "",
+        })
 
-          registrationNo: extras?.registrationNo || '',
-          companyName: extras?.companyName || '',
-          domain: extras?.domain || '',
-          companyStamp: extras?.companyStamp || '',
-          companyDoc: extras?.companyDoc || ''
-        });
+        if (profileError) {
+          throw profileError
+        }
 
-      if (profileError) {
-        throw profileError;
+        addToast({
+          title: "Registration successful",
+          message: "Please check your email to confirm your account, then log in.",
+          type: "success",
+        })
+
+        navigate("/login")
+      } catch (error) {
+        console.error("Registration error:", error)
+        addToast({
+          title: "Registration error",
+          message: "An error occurred.",
+          type: "error",
+        })
+        throw error
+      } finally {
+        setIsLoading(false)
       }
+    },
+    [addToast, navigate],
+  )
 
-      addToast({
-        title: "Registration successful",
-        message: "Please check your email to confirm your account, then log in.",
-        type: "success"
-      });
+  const value = useMemo(
+    () => ({
+      user,
+      isLoading,
+      login,
+      logout,
+      register,
+      isAuthenticated: !!user,
+      isAdmin: user?.role === "superadmin" || user?.role === "admin" || user?.role === "manager",
+    }),
+    [user, isLoading, login, logout, register],
+  )
 
-      navigate('/login');
-    } catch (error) {
-      console.error('Registration error:', error);
-      addToast({
-        title: "Registration error",
-        message: "An error occurred.",
-        type: "error"
-      });
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [addToast, navigate]);
-
-  const value = useMemo(() => ({
-    user,
-    isLoading,
-    login,
-    logout,
-    register,
-    isAuthenticated: !!user,
-    isAdmin: user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'manager'
-  }), [user, isLoading, login, logout, register]);
-
-  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
-};
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>
+}

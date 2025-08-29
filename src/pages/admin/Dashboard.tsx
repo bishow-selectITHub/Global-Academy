@@ -143,6 +143,7 @@ const AdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [fetchedCourses, setFetchedCourses] = useState([])
   const [fetchedUsers, setFetchedUsers] = useState([])
+  const [fetchedDocs, setFetchedDocs] = useState([])
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -160,6 +161,24 @@ const AdminDashboard = () => {
     }
     fetchCourses()
   }, [user])
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const { data, error } = await supabase.from("notes").select("*")
+        if (error) throw error
+        setFetchedDocs(data)
+      } catch (error: any) {
+        addToast({
+          title: "Error retrieving courses",
+          message: error.message,
+          type: "error",
+        })
+      }
+    }
+    fetchDocuments()
+  }, [user])
+
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -280,7 +299,7 @@ const AdminDashboard = () => {
             changeType="positive"
             iconBg="bg-amber-600"
           />
-          <StatCard title="Documents" value="1,248" icon={<FileText className="w-5 h-5" />} iconBg="bg-purple-600" />
+          <StatCard title="Documents" value={fetchedDocs.length} icon={<FileText className="w-5 h-5" />} iconBg="bg-purple-600" />
           <StatCard
             title="Assets"
             value="142"
@@ -417,17 +436,16 @@ const AdminDashboard = () => {
                             {course.completed} / {course.totalEnrolled} completed
                           </div>
                           <div
-                            className={`text-sm font-bold px-3 py-1.5 rounded-lg border ${
-                              course.status === "excellent"
-                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                                : course.status === "good"
-                                  ? "bg-blue-100 text-blue-700 border-blue-200"
-                                  : course.status === "average"
-                                    ? "bg-yellow-100 text-yellow-700 border-yellow-200"
-                                    : course.status === "poor"
-                                      ? "bg-orange-100 text-orange-700 border-orange-200"
-                                      : "bg-red-100 text-red-700 border-red-200"
-                            }`}
+                            className={`text-sm font-bold px-3 py-1.5 rounded-lg border ${course.status === "excellent"
+                              ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                              : course.status === "good"
+                                ? "bg-blue-100 text-blue-700 border-blue-200"
+                                : course.status === "average"
+                                  ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                  : course.status === "poor"
+                                    ? "bg-orange-100 text-orange-700 border-orange-200"
+                                    : "bg-red-100 text-red-700 border-red-200"
+                              }`}
                           >
                             {course.completionRate}%
                           </div>

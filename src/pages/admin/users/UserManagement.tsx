@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Edit, Trash2, MoreVertical, User, Mail, Shield } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, MoreVertical, User, Mail, Shield, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
@@ -27,6 +27,7 @@ const UserManagement = () => {
   const canDeleteUsers = isSuperadmin;
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [sendingInvite, setSendingInvite] = useState(false);
   const existingManagerCount = useMemo(() => users.filter(u => u.role === 'Manager').length, [users]);
   const managerSlotAvailable = existingManagerCount === 0;
   const canAddManagers = (isSuperadmin || isAdmin) && managerSlotAvailable;
@@ -130,7 +131,6 @@ const UserManagement = () => {
   const confirmDeleteUser = async () => {
     if (!userToDelete) return;
 
-    // Only superadmin can delete
     if (!canDeleteUsers) {
       addToast({
         type: "error",
@@ -148,24 +148,32 @@ const UserManagement = () => {
         throw new Error('You cannot delete your own account.');
       }
 
-      // Delete from user_roles table first (due to foreign key constraints)
-      const { error: rolesError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userToDelete.id);
+      console.log('🗑️ [DEBUG] Deleting user:', userToDelete.id, userToDelete.email);
 
-      if (rolesError) {
-        throw new Error(`Failed to delete user roles: ${rolesError.message}`);
+      // Get current user's session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No active session');
       }
 
-      // Delete from users table
-      const { error: usersError } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', userToDelete.id);
+      // Call the Edge Function to delete user from auth system
+      // Call the Edge Function to delete user from auth system
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          user_id_to_delete: userToDelete.id,
+          current_user_token: session.access_token
+        })
+      });
 
-      if (usersError) {
-        throw new Error(`Failed to delete user: ${usersError.message}`);
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to delete user');
       }
 
       // Remove user from state
@@ -174,10 +182,13 @@ const UserManagement = () => {
       addToast({
         type: "success",
         title: "User deleted",
-        message: `User ${userToDelete.name} was deleted successfully.`,
+        message: `User ${userToDelete.name} was deleted successfully from all systems.`,
         duration: 3000,
       });
+
+      console.log('✅ [DEBUG] User deletion completed successfully');
     } catch (error: any) {
+      console.error('❌ [DEBUG] User deletion failed:', error);
       addToast({
         type: "error",
         title: "Failed to delete user",
@@ -186,7 +197,7 @@ const UserManagement = () => {
       });
     } finally {
       setDeleting(false);
-      setUserToDelete(null); // close modal
+      setUserToDelete(null);
     }
   };
   // Handler for canceling deletion
@@ -527,8 +538,10 @@ const UserManagement = () => {
                 Cancel
               </Button>
               <Button
+                disabled={sendingInvite}
                 onClick={async () => {
                   try {
+                    setSendingInvite(true);
                     if (!newUser.email || !newUser.name) return;
 
                     // Determine role to send
@@ -592,10 +605,19 @@ const UserManagement = () => {
                       title: 'Failed to send invite',
                       message: e?.message || 'Try again.',
                     });
+                  } finally {
+                    setSendingInvite(false);
                   }
                 }}
               >
-                Send Invitation
+                {sendingInvite ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Invitation'
+                )}
               </Button>
             </div>
           </div>

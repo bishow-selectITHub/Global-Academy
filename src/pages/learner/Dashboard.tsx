@@ -196,11 +196,6 @@ const LearnerDashboard = () => {
     },
   ]
 
-  useEffect(() => {
-    if (!user) {
-      dispatch(fetchCurrentUser())
-    }
-  }, [dispatch, user])
 
   useEffect(() => {
     if (user?.id && (!enrollments || enrollments.length === 0)) {

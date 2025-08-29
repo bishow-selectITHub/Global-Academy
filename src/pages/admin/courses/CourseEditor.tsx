@@ -215,27 +215,34 @@ const CourseEditor = () => {
       };
 
       if (isEditing) {
-        // Update existing course
-        const { error: updateError } = await supabase
-          .from('courses')
-          .update(courseData)
-          .eq('id', id);
+        // Update existing course using Redux action
+        const result = await dispatch(updateCourse({ id: id!, ...courseData }));
 
-        if (updateError) throw updateError;
+        if (updateCourse.fulfilled.match(result)) {
+          addToast({
+            type: 'success',
+            title: 'Course updated successfully',
+            duration: 5000,
+          });
+        } else {
+          throw new Error('Failed to update course');
+        }
       } else {
-        // Create new course
-        const { error: insertError } = await supabase
-          .from('courses')
-          .insert([courseData]);
+        // Create new course using Redux action
+        const result = await dispatch(createCourse(courseData));
 
-        if (insertError) throw insertError;
+        if (createCourse.fulfilled.match(result)) {
+          addToast({
+            type: 'success',
+            title: 'Course created successfully',
+            duration: 5000,
+          });
+        } else {
+          throw new Error('Failed to create course');
+        }
       }
 
-      addToast({
-        type: 'success',
-        title: `Course ${isEditing ? 'updated' : 'created'} successfully`,
-        duration: 5000,
-      });
+      // Navigate back to course management
       navigate('/admin/courses');
     } catch (error) {
       console.error('Error saving course:', error);

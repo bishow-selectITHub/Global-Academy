@@ -4,13 +4,25 @@ import { Outlet, Navigate, useLocation, Link } from "react-router-dom"
 import { useUser } from "../contexts/UserContext"
 
 const AuthLayout = () => {
-  const { isAuthenticated, isAdmin } = useUser()
+  const { isAuthenticated, user } = useUser()
   const location = useLocation()
   const isAcceptInvite = location.pathname === "/accept-invite"
 
   // Redirect if already authenticated
   if (isAuthenticated && !isAcceptInvite) {
-    return <Navigate to={isAdmin ? "/admin" : "/dashboard"} replace />
+    // Navigate to appropriate dashboard based on role
+    const role = user?.role?.toLowerCase();
+    let redirectPath = '/';
+
+    if (role === 'superadmin' || role === 'admin' || role === 'manager') {
+      redirectPath = '/admin';
+    } else if (role === 'teacher') {
+      redirectPath = '/teacher';
+    } else if (role === 'learner') {
+      redirectPath = '/dashboard';
+    }
+
+    return <Navigate to={redirectPath} replace />
   }
 
   return (
