@@ -214,19 +214,19 @@ const AdminMeetings = () => {
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-                <div className="max-w-7xl mx-auto px-6 py-6">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
                     <div className="animate-pulse">
-                        <div className="h-9 bg-gray-200/50 rounded-lg w-1/4 mb-6"></div>
-                        <div className="space-y-4">
+                        <div className="h-6 sm:h-7 bg-gray-200/50 rounded-lg w-1/2 sm:w-1/4 mb-4 sm:mb-6"></div>
+                        <div className="space-y-3 sm:space-y-4">
                             {[1, 2, 3].map((i) => (
                                 <div
                                     key={i}
-                                    className="bg-white/80 backdrop-blur-sm dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 rounded-2xl p-6 shadow-xl"
+                                    className="bg-white/80 backdrop-blur-sm dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-xl"
                                 >
-                                    <div className="h-7 bg-gray-200/50 rounded-lg w-1/4 mb-4"></div>
+                                    <div className="h-5 sm:h-6 bg-gray-200/50 rounded-lg w-1/2 sm:w-1/4 mb-3 sm:mb-4"></div>
                                     <div className="space-y-2">
                                         {[1, 2].map((j) => (
-                                            <div key={j} className="h-20 bg-gray-200/50 rounded-lg"></div>
+                                            <div key={j} className="h-14 sm:h-16 bg-gray-200/50 rounded-lg"></div>
                                         ))}
                                     </div>
                                 </div>
@@ -242,97 +242,97 @@ const AdminMeetings = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-            <div className="max-w-7xl mx-auto px-6 py-6">
-                <div className="mb-6">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
-                            <Video className="w-5 h-5 text-white" />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+                <div className="mb-4 sm:mb-6">
+                    <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                        <div className="p-2 sm:p-2.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg sm:rounded-xl shadow-lg">
+                            <Video className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                         </div>
-                        <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
+                        <h1 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-slate-800 to-slate-600 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
                             Live Meetings
                         </h1>
                     </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 ml-10">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 ml-8 sm:ml-10">
                         Monitor and join live sessions across all courses
                     </p>
                 </div>
 
                 {Object.keys(groupedRooms).length === 0 ? (
-                    <div className="text-center py-12">
-                        <div className="bg-white/80 backdrop-blur-sm dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 rounded-2xl p-8 max-w-sm mx-auto shadow-xl">
-                            <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                                <Video className="h-6 w-6 text-slate-400" />
+                    <div className="text-center py-8 sm:py-12">
+                        <div className="bg-white/80 backdrop-blur-sm dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 rounded-lg sm:rounded-xl p-6 sm:p-8 max-w-sm mx-auto shadow-xl">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-lg sm:rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4 shadow-lg">
+                                <Video className="h-5 w-5 sm:h-6 sm:w-6 text-slate-400" />
                             </div>
-                            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No live meetings</h3>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                            <h3 className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 mb-2">No live meetings</h3>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">
                                 There are currently no live sessions across any courses.
                             </p>
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-6">
+                    <div className="space-y-4 sm:space-y-6">
                         {Object.entries(groupedRooms).map(([courseId, courseData]) => (
                             <div
                                 key={courseId}
-                                className="bg-white/80 backdrop-blur-sm dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300"
+                                className="bg-white/80 backdrop-blur-sm dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 rounded-lg sm:rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300"
                             >
-                                <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-slate-200/50 dark:border-slate-700/50">
-                                    <div className="flex items-center justify-between">
+                                <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-900/20 dark:to-indigo-900/20 px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200/50 dark:border-slate-700/50">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
                                         <div className="flex items-center">
-                                            <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl mr-4 shadow-lg">
-                                                <BookOpen className="h-5 w-5 text-white" />
+                                            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg sm:rounded-xl mr-3 sm:mr-4 shadow-lg">
+                                                <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                                             </div>
                                             <div>
-                                                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                                                <h2 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">
                                                     {courseData.courseTitle}
                                                 </h2>
-                                                <p className="text-sm text-slate-600 dark:text-slate-400">
+                                                <p className="text-xs text-slate-600 dark:text-slate-400">
                                                     {courseData.rooms.length} room{courseData.rooms.length !== 1 ? "s" : ""} •{" "}
                                                     {courseData.rooms.filter((r) => r.active).length} active
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white px-4 py-2 rounded-xl shadow-lg">
-                                                <div className="text-xl font-bold">{courseData.rooms.filter((r) => r.active).length}</div>
+                                        <div className="text-left sm:text-right">
+                                            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl shadow-lg inline-block">
+                                                <div className="text-sm sm:text-base font-bold">{courseData.rooms.filter((r) => r.active).length}</div>
                                                 <div className="text-xs opacity-90">Active</div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="p-6">
-                                    <div className="space-y-4">
+                                <div className="p-4 sm:p-6">
+                                    <div className="space-y-3 sm:space-y-4">
                                         {courseData.rooms.map((room) => (
                                             <div
                                                 key={room.id}
-                                                className="bg-slate-50/80 backdrop-blur-sm dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 rounded-xl p-5 hover:bg-slate-100/80 dark:hover:bg-slate-700/50 hover:shadow-lg transition-all duration-300 group"
+                                                className="bg-slate-50/80 backdrop-blur-sm dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 rounded-lg sm:rounded-xl p-3 sm:p-4 hover:bg-slate-100/80 dark:hover:bg-slate-700/50 hover:shadow-md transition-all duration-300 group"
                                             >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center flex-1">
+                                                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-0">
+                                                    <div className="flex items-start lg:items-center flex-1">
                                                         <div
-                                                            className={`p-2.5 rounded-xl mr-4 shadow-lg ${room.active
+                                                            className={`p-2 rounded-lg mr-3 sm:mr-4 shadow-md flex-shrink-0 ${room.active
                                                                     ? "bg-gradient-to-br from-emerald-500 to-emerald-600"
                                                                     : "bg-gradient-to-br from-orange-500 to-orange-600"
                                                                 }`}
                                                         >
-                                                            <Video className="h-5 w-5 text-white" />
+                                                            <Video className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                                                         </div>
-                                                        <div className="flex-1">
-                                                            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 mb-1.5 sm:mb-2">
                                                                 {room.room_name}
                                                             </h3>
-                                                            <div className="flex items-center space-x-6">
-                                                                <div className="flex items-center text-sm text-slate-600 dark:text-slate-400">
-                                                                    <Calendar className="h-4 w-4 mr-2" />
+                                                            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4">
+                                                                <div className="flex items-center text-xs text-slate-600 dark:text-slate-400">
+                                                                    <Calendar className="h-3 w-3 mr-1.5 flex-shrink-0" />
                                                                     <span>{getTimeAgo(room.created_at)}</span>
                                                                 </div>
-                                                                <div className="flex items-center text-sm text-slate-600 dark:text-slate-400">
-                                                                    <Clock className="h-4 w-4 mr-2" />
-                                                                    <span>{formatDate(room.created_at)}</span>
+                                                                <div className="flex items-center text-xs text-slate-600 dark:text-slate-400">
+                                                                    <Clock className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                                                                    <span className="truncate">{formatDate(room.created_at)}</span>
                                                                 </div>
                                                                 <span
-                                                                    className={`text-sm px-3 py-1.5 rounded-lg font-semibold shadow-md ${room.active
+                                                                    className={`text-xs px-2 py-1 rounded-md font-medium shadow-sm inline-block w-fit ${room.active
                                                                             ? "bg-gradient-to-r from-green-500 to-green-600 text-white"
                                                                             : "bg-white text-slate-600 border border-slate-200"
                                                                         }`}
@@ -346,19 +346,19 @@ const AdminMeetings = () => {
                                                     <Button
                                                         onClick={() => handleJoinSession(room)}
                                                         disabled={joiningSession === room.id}
-                                                        className={`text-sm font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 ml-6 ${room.active
+                                                        className={`text-xs font-medium py-2 px-4 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 w-full lg:w-auto ${room.active
                                                                 ? "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
                                                                 : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
                                                             }`}
                                                     >
                                                         {joiningSession === room.id ? (
                                                             <div className="flex items-center justify-center">
-                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1.5"></div>
                                                                 Starting...
                                                             </div>
                                                         ) : (
                                                             <div className="flex items-center justify-center">
-                                                                <Play className="h-4 w-4 mr-2" />
+                                                                <Play className="h-3 w-3 mr-1.5" />
                                                                 {room.active ? "Join" : "Start"}
                                                             </div>
                                                         )}
@@ -398,11 +398,11 @@ const AdminMeetings = () => {
                                         setCurrentSessionData(null)
                                         setJoiningSession(null)
                                     }}
-                                    className="absolute top-6 right-6 z-10 w-10 h-10 bg-gradient-to-br from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-white rounded-lg flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-2xl backdrop-blur-sm border border-gray-700"
+                                    className="absolute top-4 sm:top-6 right-4 sm:right-6 z-10 w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-white rounded-lg flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-2xl backdrop-blur-sm border border-gray-700"
                                     title="Close meeting"
                                 >
                                     <svg
-                                        className="w-5 h-5"
+                                        className="w-4 h-4 sm:w-5 sm:h-5"
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"

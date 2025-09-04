@@ -14,11 +14,11 @@ export default function Home() {
                                 🎓 Transform Your Learning Journey Today
                             </div>
 
-                            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight text-gray-900">
+                            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight text-gray-900" style={{fontFamily: 'Poppins, sans-serif'}}>
                                 Your All-in-One Platform for <span className="text-[#2369f4]">Online Learning</span>
                             </h1>
 
-                            <p className="text-base sm:text-lg lg:text-xl text-gray-600 mb-6 sm:mb-8 leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                            <p className="text-base sm:text-lg lg:text-xl text-gray-600 mb-6 sm:mb-8 leading-relaxed max-w-2xl mx-auto lg:mx-0" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                                 Global Academy integrates courses, live sessions, and interactive learning into one seamless experience,
                                 making education accessible and engaging for everyone. Join our multi-tenant platform designed for
                                 learners, educators, and institutions worldwide.
@@ -84,7 +84,7 @@ export default function Home() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                     <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
                         <div className="academy-info order-2 lg:order-1">
-                            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-6 sm:mb-8 text-center lg:text-left">
+                            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-6 sm:mb-8 text-center lg:text-left" style={{fontFamily: 'Poppins, sans-serif'}}>
                                 About Global Academy
                                 <div className="w-16 sm:w-24 h-1 bg-gradient-to-r from-[#2369f4] to-cyan-500 mt-4 rounded-full mx-auto lg:mx-0"></div>
                             </h2>
@@ -161,10 +161,10 @@ export default function Home() {
             <section className="py-12 sm:py-16 lg:py-24 bg-gray-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-12 sm:mb-16">
-                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 sm:mb-6" style={{fontFamily: 'Poppins, sans-serif'}}>
                             Everything You Need to <span className="text-[#2369f4]">Excel</span>
                         </h2>
-                        <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto">
+                        <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                             Our comprehensive platform combines cutting-edge technology with proven educational methods to deliver an
                             unmatched learning experience.
                         </p>
@@ -175,8 +175,8 @@ export default function Home() {
                             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#2369f4]/10 rounded-xl flex items-center justify-center mb-4 sm:mb-6">
                                 <img src="https://cdn-icons-png.flaticon.com/512/3002/3002543.png" alt="Courses" className="w-6 h-6 sm:w-8 sm:h-8" />
                             </div>
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">Interactive Courses</h3>
-                            <p className="text-gray-600 text-sm sm:text-base">
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3" style={{fontFamily: 'Poppins, sans-serif'}}>Interactive Courses</h3>
+                            <p className="text-gray-600 text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                                 Structured learning paths with multimedia content, assignments, and progress tracking.
                             </p>
                         </div>
@@ -189,8 +189,8 @@ export default function Home() {
                                     className="w-6 h-6 sm:w-8 sm:h-8"
                                 />
                             </div>
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">Live Sessions</h3>
-                            <p className="text-gray-600 text-sm sm:text-base">
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3" style={{fontFamily: 'Poppins, sans-serif'}}>Live Sessions</h3>
+                            <p className="text-gray-600 text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                                 Real-time interactive classes with HD video, screen sharing, and collaborative tools.
                             </p>
                         </div>
@@ -199,8 +199,8 @@ export default function Home() {
                             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#2369f4]/10 rounded-xl flex items-center justify-center mb-4 sm:mb-6">
                                 <img src="https://cdn-icons-png.flaticon.com/512/3281/3281289.png" alt="Quizzes" className="w-6 h-6 sm:w-8 sm:h-8" />
                             </div>
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">Smart Assessments</h3>
-                            <p className="text-gray-600 text-sm sm:text-base">
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3" style={{fontFamily: 'Poppins, sans-serif'}}>Smart Assessments</h3>
+                            <p className="text-gray-600 text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                                 Adaptive quizzes and tests that adjust to your learning pace and provide instant feedback.
                             </p>
                         </div>
@@ -213,8 +213,8 @@ export default function Home() {
                                     className="w-6 h-6 sm:w-8 sm:h-8"
                                 />
                             </div>
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">Verified Certificates</h3>
-                            <p className="text-gray-600 text-sm sm:text-base">
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3" style={{fontFamily: 'Poppins, sans-serif'}}>Verified Certificates</h3>
+                            <p className="text-gray-600 text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                                 Industry-recognized certificates with blockchain verification and LinkedIn integration.
                             </p>
                         </div>
@@ -225,7 +225,7 @@ export default function Home() {
             <section className="py-12 sm:py-16 lg:py-20 bg-white">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-8 sm:mb-12">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Trusted by Learners Worldwide</h2>
+                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4" style={{fontFamily: 'Poppins, sans-serif'}}>Trusted by Learners Worldwide</h2>
                         <p className="text-gray-600 text-sm sm:text-base">Join thousands of successful students and educators</p>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
@@ -252,8 +252,8 @@ export default function Home() {
             {/* CTA Section */}
             <section className="bg-gradient-to-r from-[#2369f4] to-indigo-600 py-12 sm:py-16 lg:py-20">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                    <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 sm:mb-6">Ready to Transform Your Future?</h2>
-                    <p className="text-base sm:text-lg lg:text-xl text-white/90 mb-6 sm:mb-8 max-w-2xl mx-auto">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 sm:mb-6" style={{fontFamily: 'Poppins, sans-serif'}}>Ready to Transform Your Future?</h2>
+                    <p className="text-base sm:text-lg lg:text-xl text-white/90 mb-6 sm:mb-8 max-w-2xl mx-auto" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                         Join thousands of successful learners who have advanced their careers with Global Academy. Start your
                         journey today with our free trial.
                     </p>

@@ -103,10 +103,10 @@ export default function Pricing() {
                     <div className="inline-flex items-center px-3 sm:px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-xs sm:text-sm font-medium mb-6 sm:mb-8">
                         💎 Transparent Pricing
                     </div>
-                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 sm:mb-6">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 sm:mb-6" style={{fontFamily: 'Poppins, sans-serif'}}>
                         Simple, <span style={{ color: "#2369f4" }}>Fair Pricing</span>
                     </h1>
-                    <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                         Choose the perfect plan for your learning journey. All plans include our core features with no hidden fees.
                         Start free and scale as you grow.
                     </p>
@@ -134,14 +134,14 @@ export default function Pricing() {
                             )}
 
                             <div className="text-center mb-6 sm:mb-8">
-                                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">{plan.name}</h3>
+                                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4" style={{fontFamily: 'Poppins, sans-serif'}}>{plan.name}</h3>
                                 <div className="mb-3 sm:mb-4">
                                     <span className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900">{plan.price}</span>
                                     {plan.period !== "Forever" && (
                                         <span className="text-gray-600 ml-2 text-sm sm:text-base">/{plan.period.split(" ")[1]}</span>
                                     )}
                                 </div>
-                                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">{plan.description}</p>
+                                <p className="text-gray-600 leading-relaxed text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>{plan.description}</p>
                             </div>
 
                             <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
@@ -150,7 +150,7 @@ export default function Pricing() {
                                         <div className="w-4 h-4 sm:w-5 sm:h-5 bg-blue-100 rounded-full flex items-center justify-center mr-3 mt-1">
                                             <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full" style={{ backgroundColor: "#2369f4" }}></div>
                                         </div>
-                                        <span className="text-gray-700 text-sm sm:text-base">{feature}</span>
+                                        <span className="text-gray-700 text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>{feature}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -172,14 +172,14 @@ export default function Pricing() {
 
                 {/* Feature Comparison */}
                 <div className="bg-white rounded-3xl p-6 sm:p-8 mb-12 sm:mb-16 lg:mb-20 border border-gray-200 shadow-lg">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-8 sm:mb-12">Why Choose Global Academy?</h2>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-8 sm:mb-12" style={{fontFamily: 'Poppins, sans-serif'}}>Why Choose Global Academy?</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
                         <div className="text-center">
                             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                 <img src="https://cdn-icons-png.flaticon.com/512/2092/2092063.png" alt="Security" className="w-6 h-6 sm:w-8 sm:h-8" />
                             </div>
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Enterprise Security</h3>
-                            <p className="text-gray-600 text-sm sm:text-base">Bank-level encryption and blockchain certificate verification</p>
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Poppins, sans-serif'}}>Enterprise Security</h3>
+                            <p className="text-gray-600 text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Bank-level encryption and blockchain certificate verification</p>
                         </div>
                         <div className="text-center">
                             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -189,15 +189,15 @@ export default function Pricing() {
                                     className="w-6 h-6 sm:w-8 sm:h-8"
                                 />
                             </div>
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Infinite Scalability</h3>
-                            <p className="text-gray-600 text-sm sm:text-base">Multi-tenant architecture that grows with your organization</p>
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Poppins, sans-serif'}}>Infinite Scalability</h3>
+                            <p className="text-gray-600 text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Multi-tenant architecture that grows with your organization</p>
                         </div>
                         <div className="text-center">
                             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                 <img src="https://cdn-icons-png.flaticon.com/512/1067/1067566.png" alt="Support" className="w-6 h-6 sm:w-8 sm:h-8" />
                             </div>
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">24/7 Support</h3>
-                            <p className="text-gray-600 text-sm sm:text-base">Round-the-clock assistance from our expert team</p>
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Poppins, sans-serif'}}>24/7 Support</h3>
+                            <p className="text-gray-600 text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Round-the-clock assistance from our expert team</p>
                         </div>
                     </div>
                 </div>
@@ -205,15 +205,15 @@ export default function Pricing() {
                 {/* FAQ Section */}
                 <div className="max-w-4xl mx-auto">
                     <div className="text-center mb-8 sm:mb-12">
-                        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
-                        <p className="text-base sm:text-lg lg:text-xl text-gray-600">Everything you need to know about our pricing and plans</p>
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4" style={{fontFamily: 'Poppins, sans-serif'}}>Frequently Asked Questions</h2>
+                        <p className="text-base sm:text-lg lg:text-xl text-gray-600" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Everything you need to know about our pricing and plans</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
                         {faqs.map((faq, index) => (
                             <div key={index} className="bg-white rounded-2xl p-4 sm:p-6 border border-gray-200 shadow-sm">
-                                <h3 className="font-bold text-gray-900 mb-2 sm:mb-3 text-sm sm:text-base">{faq.question}</h3>
-                                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">{faq.answer}</p>
+                                <h3 className="font-bold text-gray-900 mb-2 sm:mb-3 text-sm sm:text-base" style={{fontFamily: 'Poppins, sans-serif'}}>{faq.question}</h3>
+                                <p className="text-gray-600 leading-relaxed text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>{faq.answer}</p>
                             </div>
                         ))}
                     </div>
@@ -225,8 +225,8 @@ export default function Pricing() {
                         className="rounded-3xl p-8 sm:p-12 shadow-2xl"
                         style={{ background: `linear-gradient(135deg, #2369f4 0%, #1e5ce8 100%)` }}
                     >
-                        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6">Ready to Get Started?</h2>
-                        <p className="text-base sm:text-lg lg:text-xl text-blue-100 mb-6 sm:mb-8 max-w-2xl mx-auto">
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6" style={{fontFamily: 'Poppins, sans-serif'}}>Ready to Get Started?</h2>
+                        <p className="text-base sm:text-lg lg:text-xl text-blue-100 mb-6 sm:mb-8 max-w-2xl mx-auto" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                             Join thousands of learners and educators who trust Global Academy for their online learning needs.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">

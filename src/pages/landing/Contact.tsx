@@ -38,11 +38,11 @@ export default function Contact() {
                         <span className="text-base sm:text-lg mr-2">💬</span>
                         Let's Connect
                     </div>
-                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 mb-6 sm:mb-8 leading-tight">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 mb-6 sm:mb-8 leading-tight" style={{fontFamily: 'Poppins, sans-serif'}}>
                         Get in{" "}
                         <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Touch</span>
                     </h1>
-                    <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                         Have questions about Global Academy? We'd love to hear from you. Send us a message and we'll respond as soon
                         as possible.
                     </p>
@@ -51,7 +51,7 @@ export default function Contact() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
                     {/* Contact Form */}
                     <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 sm:p-8 lg:p-10 shadow-xl border border-gray-200/50 order-2 lg:order-1">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 sm:mb-8">Send us a message</h2>
+                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 sm:mb-8" style={{fontFamily: 'Poppins, sans-serif'}}>Send us a message</h2>
                         <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 <div>
@@ -150,7 +150,7 @@ export default function Contact() {
                     {/* Contact Information */}
                     <div className="space-y-6 sm:space-y-8 order-1 lg:order-2">
                         <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl p-6 sm:p-8 lg:p-10 text-white shadow-xl">
-                            <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">Contact Information</h2>
+                            <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8" style={{fontFamily: 'Poppins, sans-serif'}}>Contact Information</h2>
 
                             <div className="space-y-6 sm:space-y-8">
                                 <div className="flex items-start">
@@ -165,9 +165,9 @@ export default function Contact() {
                                         </svg>
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2">Email</h3>
-                                        <p className="text-blue-100 text-sm sm:text-lg">support@globalacademy.com</p>
-                                        <p className="text-blue-100 text-sm sm:text-lg">sales@globalacademy.com</p>
+                                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2" style={{fontFamily: 'Poppins, sans-serif'}}>Email</h3>
+                                        <p className="text-blue-100 text-sm sm:text-lg" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>support@globalacademy.com</p>
+                                        <p className="text-blue-100 text-sm sm:text-lg" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>sales@globalacademy.com</p>
                                     </div>
                                 </div>
 
@@ -183,9 +183,9 @@ export default function Contact() {
                                         </svg>
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2">Phone</h3>
-                                        <p className="text-blue-100 text-sm sm:text-lg">+1 (555) 123-4567</p>
-                                        <p className="text-blue-100 text-xs sm:text-sm">Mon-Fri, 9am-6pm EST</p>
+                                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2" style={{fontFamily: 'Poppins, sans-serif'}}>Phone</h3>
+                                        <p className="text-blue-100 text-sm sm:text-lg" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>+1 (555) 123-4567</p>
+                                        <p className="text-blue-100 text-xs sm:text-sm" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Mon-Fri, 9am-6pm EST</p>
                                     </div>
                                 </div>
 
@@ -207,15 +207,15 @@ export default function Contact() {
                                         </svg>
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2">Office</h3>
-                                        <p className="text-blue-100 text-sm sm:text-lg">123 Learning Street</p>
-                                        <p className="text-blue-100 text-sm sm:text-lg">Education City, EC 12345</p>
+                                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2" style={{fontFamily: 'Poppins, sans-serif'}}>Office</h3>
+                                        <p className="text-blue-100 text-sm sm:text-lg" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>123 Learning Street</p>
+                                        <p className="text-blue-100 text-sm sm:text-lg" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Education City, EC 12345</p>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-white/20">
-                                <h3 className="font-bold text-lg sm:text-xl text-white mb-4 sm:mb-6">Follow Us</h3>
+                                <h3 className="font-bold text-lg sm:text-xl text-white mb-4 sm:mb-6" style={{fontFamily: 'Poppins, sans-serif'}}>Follow Us</h3>
                                 <div className="flex space-x-3 sm:space-x-4">
                                     <a
                                         href="#"
@@ -249,15 +249,15 @@ export default function Contact() {
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
                                     <span className="text-xl sm:text-2xl">💬</span>
                                 </div>
-                                <h3 className="font-bold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Live Chat</h3>
-                                <p className="text-gray-600 text-xs sm:text-sm">Available 24/7</p>
+                                <h3 className="font-bold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base" style={{fontFamily: 'Poppins, sans-serif'}}>Live Chat</h3>
+                                <p className="text-gray-600 text-xs sm:text-sm" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Available 24/7</p>
                             </div>
                             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-200/50 text-center hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
                                     <span className="text-xl sm:text-2xl">📞</span>
                                 </div>
-                                <h3 className="font-bold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Schedule Call</h3>
-                                <p className="text-gray-600 text-xs sm:text-sm">Book a demo</p>
+                                <h3 className="font-bold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base" style={{fontFamily: 'Poppins, sans-serif'}}>Schedule Call</h3>
+                                <p className="text-gray-600 text-xs sm:text-sm" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Book a demo</p>
                             </div>
                         </div>
                     </div>

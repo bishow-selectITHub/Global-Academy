@@ -72,13 +72,13 @@ export default function Testimonials() {
                         <span className="text-base sm:text-lg mr-2">💬</span>
                         Trusted Worldwide
                     </div>
-                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 mb-6 sm:mb-8 leading-tight">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 mb-6 sm:mb-8 leading-tight" style={{fontFamily: 'Poppins, sans-serif'}}>
                         Loved by{" "}
                         <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Learners</span>
                         <br />
                         Worldwide
                     </h1>
-                    <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                         See what our community of learners, educators, and organizations have to say about their Global Academy
                         experience
                     </p>
@@ -93,7 +93,7 @@ export default function Testimonials() {
                                 <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
                                     {stat.number}
                                 </div>
-                                <div className="text-gray-600 font-medium text-xs sm:text-sm">{stat.label}</div>
+                                <div className="text-gray-600 font-medium text-xs sm:text-sm" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>{stat.label}</div>
                             </div>
                         </div>
                     ))}
@@ -116,7 +116,7 @@ export default function Testimonials() {
                             </div>
 
                             {/* Content */}
-                            <p className="text-gray-700 mb-6 sm:mb-8 leading-relaxed text-sm sm:text-base lg:text-lg italic">"{testimonial.content}"</p>
+                            <p className="text-gray-700 mb-6 sm:mb-8 leading-relaxed text-sm sm:text-base lg:text-lg italic" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>"{testimonial.content}"</p>
 
                             {/* Author */}
                             <div className="flex items-center">
@@ -126,9 +126,9 @@ export default function Testimonials() {
                                     className="w-12 h-12 sm:w-14 sm:h-14 rounded-full mr-3 sm:mr-4 ring-4 ring-blue-100 group-hover:ring-blue-200 transition-all"
                                 />
                                 <div>
-                                    <div className="font-bold text-gray-900 text-base sm:text-lg">{testimonial.name}</div>
-                                    <div className="text-xs sm:text-sm text-blue-600 font-medium">{testimonial.role}</div>
-                                    <div className="text-xs sm:text-sm text-gray-500">{testimonial.company}</div>
+                                    <div className="font-bold text-gray-900 text-base sm:text-lg" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>{testimonial.name}</div>
+                                    <div className="text-xs sm:text-sm text-blue-600 font-medium" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>{testimonial.role}</div>
+                                    <div className="text-xs sm:text-sm text-gray-500" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>{testimonial.company}</div>
                                 </div>
                             </div>
                         </div>
@@ -138,8 +138,8 @@ export default function Testimonials() {
                 {/* CTA Section */}
                 <div className="text-center">
                     <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-blue-700 rounded-3xl p-8 sm:p-12 lg:p-16 text-white shadow-2xl">
-                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 sm:mb-8">Join Our Success Stories</h2>
-                        <p className="text-base sm:text-lg lg:text-xl text-blue-100 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed">
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 sm:mb-8" style={{fontFamily: 'Poppins, sans-serif'}}>Join Our Success Stories</h2>
+                        <p className="text-base sm:text-lg lg:text-xl text-blue-100 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                             Start your learning journey today and become part of our growing community of successful learners
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">

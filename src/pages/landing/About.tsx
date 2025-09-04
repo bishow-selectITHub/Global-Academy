@@ -50,8 +50,8 @@ export default function About() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
                 <div className="text-center mb-12 sm:mb-16">
-                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">About Global Academy</h1>
-                    <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6" style={{fontFamily: 'Poppins, sans-serif'}}>About Global Academy</h1>
+                    <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                         We're on a mission to democratize education and make high-quality learning experiences accessible to
                         everyone, everywhere.
                     </p>
@@ -60,18 +60,18 @@ export default function About() {
                 {/* Story Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-16 sm:mb-20">
                     <div className="order-2 lg:order-1">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6 text-center lg:text-left">Our Story</h2>
+                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6 text-center lg:text-left" style={{fontFamily: 'Poppins, sans-serif'}}>Our Story</h2>
                         <div className="space-y-3 sm:space-y-4 text-gray-600 leading-relaxed text-sm sm:text-base text-center lg:text-left">
-                            <p>
+                            <p style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                                 Founded in 2020, Global Academy emerged from a simple yet powerful vision: to create a learning platform
                                 that combines the best of traditional education with modern technology.
                             </p>
-                            <p>
+                            <p style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                                 Our founders, experienced educators and technologists, recognized the need for a comprehensive platform
                                 that could deliver engaging, interactive learning experiences at scale. They set out to build something
                                 that would serve individual learners, educational institutions, and organizations alike.
                             </p>
-                            <p>
+                            <p style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                                 Today, Global Academy serves over 50,000 active learners across 80+ countries, offering everything from
                                 individual courses to enterprise-wide training programs. We're proud to be at the forefront of the
                                 online learning revolution.
@@ -90,8 +90,8 @@ export default function About() {
                 {/* Values Section */}
                 <div className="mb-16 sm:mb-20">
                     <div className="text-center mb-8 sm:mb-12">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Our Values</h2>
-                        <p className="text-base sm:text-lg text-gray-600">The principles that guide everything we do</p>
+                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4" style={{fontFamily: 'Poppins, sans-serif'}}>Our Values</h2>
+                        <p className="text-base sm:text-lg text-gray-600" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>The principles that guide everything we do</p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
@@ -100,8 +100,8 @@ export default function About() {
                                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
                                     <img src={value.icon || "/placeholder.svg"} alt={value.title} className="w-6 h-6 sm:w-8 sm:h-8" />
                                 </div>
-                                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">{value.title}</h3>
-                                <p className="text-gray-600 text-sm sm:text-base">{value.description}</p>
+                                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3" style={{fontFamily: 'Poppins, sans-serif'}}>{value.title}</h3>
+                                <p className="text-gray-600 text-sm sm:text-base" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>{value.description}</p>
                             </div>
                         ))}
                     </div>
@@ -110,8 +110,8 @@ export default function About() {
                 {/* Team Section */}
                 <div className="mb-16 sm:mb-20">
                     <div className="text-center mb-8 sm:mb-12">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Meet Our Team</h2>
-                        <p className="text-base sm:text-lg text-gray-600">The passionate people behind Global Academy</p>
+                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4" style={{fontFamily: 'Poppins, sans-serif'}}>Meet Our Team</h2>
+                        <p className="text-base sm:text-lg text-gray-600" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>The passionate people behind Global Academy</p>
                     </div>
 
                     <div className="flex ">
@@ -122,11 +122,11 @@ export default function About() {
                                     alt={member.name}
                                     className="w-24 h-24 sm:w-32 sm:h-32 rounded-full mx-auto mb-4 object-cover shadow-lg"
                                 />
-                                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1">{member.name}</h3>
+                                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1" style={{fontFamily: 'Poppins, sans-serif'}}>{member.name}</h3>
                                 <p className="font-medium mb-2 sm:mb-3 text-sm sm:text-base" style={{ color: "#2369f4" }}>
                                     {member.role}
                                 </p>
-                                <p className="text-gray-600 text-xs sm:text-sm">{member.bio}</p>
+                                <p className="text-gray-600 text-xs sm:text-sm" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>{member.bio}</p>
                             </div>
                         ))}
                     </div>
@@ -134,8 +134,8 @@ export default function About() {
 
                 {/* Mission Section */}
                 <div className="bg-blue-50 rounded-2xl p-8 sm:p-12 text-center border border-blue-100">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">Our Mission</h2>
-                    <p className="text-base sm:text-lg lg:text-xl text-gray-700 max-w-4xl mx-auto leading-relaxed">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6" style={{fontFamily: 'Poppins, sans-serif'}}>Our Mission</h2>
+                    <p className="text-base sm:text-lg lg:text-xl text-gray-700 max-w-4xl mx-auto leading-relaxed" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                         To empower individuals and organizations worldwide with accessible, engaging, and effective learning
                         experiences that drive personal growth, professional development, and positive change in communities.
                     </p>

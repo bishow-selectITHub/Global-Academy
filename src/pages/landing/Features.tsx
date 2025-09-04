@@ -52,13 +52,13 @@ export default function Features() {
                         <span className="w-2 h-2 bg-blue-500 rounded-full mr-3 animate-pulse"></span>
                         Comprehensive Learning Platform
                     </div>
-                    <h1 className="text-6xl md:text-7xl font-bold text-gray-900 mb-8 leading-tight">
+                    <h1 className="text-6xl md:text-7xl font-bold text-gray-900 mb-8 leading-tight" style={{fontFamily: 'Poppins, sans-serif'}}>
                         Powerful Features for <br />
                         <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
                             Modern Learning
                         </span>
                     </h1>
-                    <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                         Everything you need to create, deliver, and manage exceptional online learning experiences. Our platform
                         combines cutting-edge technology with proven educational methods.
                     </p>
@@ -79,10 +79,10 @@ export default function Features() {
                                 />
                             </div>
 
-                            <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-blue-600 transition-colors">
+                            <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-blue-600 transition-colors" style={{fontFamily: 'Poppins, sans-serif'}}>
                                 {feature.title}
                             </h3>
-                            <p className="text-gray-600 mb-6 leading-relaxed">{feature.description}</p>
+                            <p className="text-gray-600 mb-6 leading-relaxed" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>{feature.description}</p>
 
                             <ul className="space-y-3">
                                 {feature.benefits.map((benefit, idx) => (
@@ -101,10 +101,10 @@ export default function Features() {
                     {/* Live Sessions Detail */}
                     <div className="grid lg:grid-cols-2 gap-12 items-center">
                         <div>
-                            <h2 className="text-4xl font-bold text-gray-900 mb-6">
+                            <h2 className="text-4xl font-bold text-gray-900 mb-6" style={{fontFamily: 'Poppins, sans-serif'}}>
                                 Interactive <span className="text-[#2369f4]">Live Sessions</span>
                             </h2>
-                            <p className="text-xl text-gray-600 mb-8">
+                            <p className="text-xl text-gray-600 mb-8" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                                 Transform traditional learning with real-time interactive sessions that engage students like never
                                 before.
                             </p>
@@ -114,8 +114,8 @@ export default function Features() {
                                         <div className="w-2 h-2 bg-[#2369f4] rounded-full"></div>
                                     </div>
                                     <div>
-                                        <h4 className="font-semibold text-gray-900">HD Video & Audio</h4>
-                                        <p className="text-gray-600">Crystal clear communication with adaptive quality</p>
+                                        <h4 className="font-semibold text-gray-900" style={{fontFamily: 'Poppins, sans-serif'}}>HD Video & Audio</h4>
+                                        <p className="text-gray-600" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Crystal clear communication with adaptive quality</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-4">
@@ -123,8 +123,8 @@ export default function Features() {
                                         <div className="w-2 h-2 bg-[#2369f4] rounded-full"></div>
                                     </div>
                                     <div>
-                                        <h4 className="font-semibold text-gray-900">Interactive Whiteboard</h4>
-                                        <p className="text-gray-600">Collaborative drawing and annotation tools</p>
+                                        <h4 className="font-semibold text-gray-900" style={{fontFamily: 'Poppins, sans-serif'}}>Interactive Whiteboard</h4>
+                                        <p className="text-gray-600" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Collaborative drawing and annotation tools</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-4">
@@ -132,8 +132,8 @@ export default function Features() {
                                         <div className="w-2 h-2 bg-[#2369f4] rounded-full"></div>
                                     </div>
                                     <div>
-                                        <h4 className="font-semibold text-gray-900">Session Recording</h4>
-                                        <p className="text-gray-600">Automatic recording for later review</p>
+                                        <h4 className="font-semibold text-gray-900" style={{fontFamily: 'Poppins, sans-serif'}}>Session Recording</h4>
+                                        <p className="text-gray-600" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Automatic recording for later review</p>
                                     </div>
                                 </div>
                             </div>
@@ -153,29 +153,29 @@ export default function Features() {
                     {/* Assessment Detail */}
                     <div className="grid lg:grid-cols-2 gap-12 items-center">
                         <div className="lg:order-2">
-                            <h2 className="text-4xl font-bold text-gray-900 mb-6">
+                            <h2 className="text-4xl font-bold text-gray-900 mb-6" style={{fontFamily: 'Poppins, sans-serif'}}>
                                 Smart <span className="text-[#2369f4]">Assessments</span>
                             </h2>
-                            <p className="text-xl text-gray-600 mb-8">
+                            <p className="text-xl text-gray-600 mb-8" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                                 Create engaging quizzes and tests that adapt to student performance and provide instant, meaningful
                                 feedback.
                             </p>
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="text-center">
                                     <div className="text-3xl font-bold text-[#2369f4] mb-2">15+</div>
-                                    <div className="text-gray-600">Question Types</div>
+                                    <div className="text-gray-600" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Question Types</div>
                                 </div>
                                 <div className="text-center">
                                     <div className="text-3xl font-bold text-[#2369f4] mb-2">Auto</div>
-                                    <div className="text-gray-600">Grading</div>
+                                    <div className="text-gray-600" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Grading</div>
                                 </div>
                                 <div className="text-center">
                                     <div className="text-3xl font-bold text-[#2369f4] mb-2">Real-time</div>
-                                    <div className="text-gray-600">Feedback</div>
+                                    <div className="text-gray-600" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Feedback</div>
                                 </div>
                                 <div className="text-center">
                                     <div className="text-3xl font-bold text-[#2369f4] mb-2">Advanced</div>
-                                    <div className="text-gray-600">Analytics</div>
+                                    <div className="text-gray-600" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>Analytics</div>
                                 </div>
                             </div>
                         </div>
@@ -195,8 +195,8 @@ export default function Features() {
                 {/* CTA Section */}
                 <div className="text-center mt-32">
                     <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-cyan-700 rounded-3xl p-16 text-white shadow-2xl">
-                        <h2 className="text-5xl font-bold mb-8">Ready to Transform Learning?</h2>
-                        <p className="text-xl text-blue-100 mb-12 max-w-3xl mx-auto leading-relaxed">
+                        <h2 className="text-5xl font-bold mb-8" style={{fontFamily: 'Poppins, sans-serif'}}>Ready to Transform Learning?</h2>
+                        <p className="text-xl text-blue-100 mb-12 max-w-3xl mx-auto leading-relaxed" style={{fontFamily: 'Plus Jakarta Sans, sans-serif'}}>
                             Join thousands of educators and organizations who trust Global Academy to deliver exceptional learning
                             experiences.
                         </p>
