@@ -36,6 +36,9 @@ interface Lesson {
   completed: boolean
   content?: string
   resources?: any[]
+  custom_fields?: any
+  notes?: string
+  time_spent?: number
 }
 
 interface Enrollment {
@@ -85,6 +88,20 @@ const LessonView = () => {
   const [localLessons, setLocalLessons] = useState<Lesson[]>(userLessons)
   const [localProgress, setLocalProgress] = useState<number>(enrollment?.progress || 0)
 
+  // Helper function to calculate accurate progress
+  const calculateProgress = (lessons: Lesson[]) => {
+    if (!lessons || lessons.length === 0) return 0
+    const completedCount = lessons.filter(lesson => lesson.completed).length
+    return Math.round((completedCount / lessons.length) * 100)
+  }
+
+  // Helper function to get lesson completion status
+  const getLessonCompletionStatus = (lessonId: string) => {
+    if (!enrollment?.lessons) return false
+    const lesson = enrollment.lessons.find((l: any) => l.id === lessonId)
+    return lesson?.completed || false
+  }
+
   useEffect(() => {
     setLocalLessons(userLessons)
   }, [userLessons])
@@ -122,26 +139,149 @@ const LessonView = () => {
         throw new Error("User or course not found")
       }
 
+      // Check if lesson is already completed
+      if (lesson.completed) {
+        addToast({
+          type: "info",
+          title: "Lesson Already Completed",
+          message: "This lesson has already been marked as complete.",
+          duration: 3000,
+        })
+        return
+      }
+
       // 1. Update local instantly (optimistic UI)
       const updatedLessons = localLessons.map((l) => (l.id === lessonId ? { ...l, completed: true } : l))
-      const completedCount = updatedLessons.filter((l) => l.completed).length
-      const total = updatedLessons.length
-      const newProgress = total > 0 ? Math.round((completedCount / total) * 100) : 0
+      const newProgress = calculateProgress(updatedLessons)
 
       setLocalLessons(updatedLessons)
       setLocalProgress(newProgress)
 
-      // 2. Sync with backend + Redux
+      // 2. Prepare lessons data for database storage
+      // Merge with existing lesson data to preserve any additional information
+      const existingLessons = enrollment?.lessons || []
+      const lessonsForStorage = updatedLessons.map((lesson) => {
+        const existingLesson = existingLessons.find((el: any) => el.id === lesson.id)
+        return {
+          id: lesson.id,
+          title: lesson.title,
+          type: lesson.type,
+          completed: lesson.completed,
+          completed_at: lesson.completed ? new Date().toISOString() : null,
+          last_accessed: new Date().toISOString(),
+          // Preserve any existing custom fields
+          ...(existingLesson && { 
+            custom_fields: existingLesson.custom_fields,
+            notes: existingLesson.notes,
+            time_spent: existingLesson.time_spent
+          })
+        }
+      })
+
+      // Validate data before sending
+      if (!lessonsForStorage || lessonsForStorage.length === 0) {
+        throw new Error("Invalid lessons data")
+      }
+
+      // Validate that the lesson being completed exists
+      const lessonToComplete = lessonsForStorage.find(l => l.id === lessonId)
+      if (!lessonToComplete) {
+        throw new Error("Lesson not found in course data")
+      }
+
+      // Validate progress calculation
+      if (newProgress < 0 || newProgress > 100) {
+        throw new Error("Invalid progress calculation")
+      }
+
+      // 3. Update database directly first
+      if (!enrollment) {
+        // Try to create an enrollment if it doesn't exist
+        console.log("No enrollment found, attempting to create one...")
+        
+        const { data: newEnrollment, error: createError } = await supabase
+          .from("course_enrollments")
+          .insert({
+            user_id: user.id,
+            course_id: courseId,
+            enrolled_at: new Date().toISOString(),
+            progress: 0,
+            lessons: [],
+            status: "active"
+          })
+          .select()
+          .single()
+
+        if (createError) {
+          console.error("Failed to create enrollment:", createError)
+          throw new Error("Failed to create enrollment. Please try enrolling in the course first.")
+        }
+
+        console.log("New enrollment created:", newEnrollment)
+      }
+
+      // Update the course_enrollments table directly
+      const { data: updateResult, error: updateError } = await supabase
+        .from("course_enrollments")
+        .update({
+          lessons: lessonsForStorage,
+          progress: newProgress,
+          updated_at: new Date().toISOString()
+        })
+        .eq("user_id", user.id)
+        .eq("course_id", courseId)
+        .select()
+
+      if (updateError) {
+        console.error("Database update error:", updateError)
+        throw new Error(`Failed to update database: ${updateError.message}`)
+      }
+
+      console.log("Database updated successfully:", updateResult)
+
+      // 4. Update Redux store
       const result = await dispatch(
         updateEnrollment({
           userId: user.id,
           courseId,
-          lessons: updatedLessons,
+          lessons: lessonsForStorage,
           progress: newProgress,
         }),
       )
 
-      // 3. Navigation
+      // Refresh enrollment data to ensure UI is in sync
+      try {
+        const { data: refreshedEnrollment, error: refreshError } = await supabase
+          .from("course_enrollments")
+          .select("*, course:courses(*)")
+          .eq("user_id", user.id)
+          .eq("course_id", courseId)
+          .single()
+
+        if (!refreshError && refreshedEnrollment) {
+          console.log("Enrollment data refreshed:", refreshedEnrollment)
+          // Update local state with fresh data
+          setLocalProgress(refreshedEnrollment.progress || 0)
+        }
+      } catch (refreshError) {
+        console.warn("Failed to refresh enrollment data:", refreshError)
+      }
+
+      // 5. Show success message
+      addToast({
+        type: "success",
+        title: "Lesson Completed! 🎉",
+        message: `Great job! You've completed "${lesson.title}"`,
+        duration: 3000,
+      })
+
+      // Log completion for debugging
+      console.log(`Lesson completed: ${lesson.title} (${lesson.id})`)
+      console.log(`New progress: ${newProgress}%`)
+      console.log(`Completed lessons: ${updatedLessons.filter(l => l.completed).length}/${updatedLessons.length}`)
+      console.log("Lessons data saved to database:", lessonsForStorage)
+
+      // 6. Navigation
       const currentIndex = localLessons.findIndex((l) => l.id === lessonId)
       const isLastLesson = currentIndex === localLessons.length - 1
 
@@ -149,9 +289,30 @@ const LessonView = () => {
         addToast({
           type: "success",
           title: "🎉 Course Completed!",
-          message: "You finished all lessons!",
+          message: "Congratulations! You've finished all lessons in this course!",
           duration: 5000,
         })
+
+        // Update course completion status in the database
+        try {
+          const { error: completionError } = await supabase
+            .from("course_enrollments")
+            .update({
+              status: "completed",
+              completed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq("user_id", user.id)
+            .eq("course_id", courseId)
+
+          if (completionError) {
+            console.warn("Failed to update course completion status:", completionError)
+          } else {
+            console.log("Course marked as completed in database")
+          }
+        } catch (completionError) {
+          console.warn("Failed to update course completion status:", completionError)
+        }
 
         setTimeout(() => {
           navigate(`/courses/${courseId}`)
@@ -160,9 +321,15 @@ const LessonView = () => {
         const nextLesson = localLessons[currentIndex + 1]
         setTimeout(() => {
           navigate(`/courses/${courseId}/lessons/${nextLesson.id}`)
-        }, 500) // small delay for smoothness
+        }, 1000) // slightly longer delay to show completion message
       }
     } catch (error: any) {
+      // Revert optimistic updates on error
+      setLocalLessons(userLessons)
+      setLocalProgress(enrollment?.progress || 0)
+      
+      console.error("Lesson completion error:", error)
+      
       addToast({
         type: "error",
         title: "Error updating progress",
@@ -261,46 +428,84 @@ const LessonView = () => {
               />
             )}
 
-            <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-between">
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Bookmark size={16} />}
-                  onClick={() =>
-                    addToast({
-                      type: "success",
-                      title: "Bookmarked",
-                      message: "Lesson added to your bookmarks",
-                      duration: 3000,
-                    })
-                  }
-                >
-                  Bookmark
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<MessageSquare size={16} />}
-                  onClick={() => setShowNotes(!showNotes)}
-                >
-                  {showNotes ? "Hide Notes" : "Add Notes"}
-                </Button>
-              </div>
+                         <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-between">
+               <div className="flex space-x-2">
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   leftIcon={<Bookmark size={16} />}
+                   onClick={() =>
+                     addToast({
+                       type: "success",
+                       title: "Bookmarked",
+                       message: "Lesson added to your bookmarks",
+                       duration: 3000,
+                     })
+                   }
+                 >
+                   Bookmark
+                 </Button>
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   leftIcon={<MessageSquare size={16} />}
+                   onClick={() => setShowNotes(!showNotes)}
+                 >
+                   {showNotes ? "Hide Notes" : "Add Notes"}
+                 </Button>
+               </div>
 
-              <div className="flex space-x-3">
-                {lesson.completed ? (
-                  <div className="flex items-center text-green-600 dark:text-green-400">
-                    <CheckCircle size={18} className="mr-1" />
-                    <span>Completed</span>
-                  </div>
-                ) : (
-                  <Button onClick={markAsComplete} leftIcon={<CheckCircle size={16} />}>
-                    Mark as Complete
-                  </Button>
-                )}
-              </div>
-            </div>
+               <div className="flex space-x-3">
+                 {lesson.completed ? (
+                   <div className="flex items-center text-green-600 dark:text-green-400">
+                     <CheckCircle size={18} className="mr-1" />
+                     <span>Completed</span>
+                   </div>
+                 ) : (
+                   <Button onClick={markAsComplete} leftIcon={<CheckCircle size={16} />}>
+                     Mark as Complete
+                   </Button>
+                 )}
+               </div>
+             </div>
+
+             {/* Course Completion Button - Shows when all lessons are completed */}
+             {localProgress === 100 && (
+               <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                 <div className="flex items-center justify-between">
+                   <div className="flex items-center">
+                     <CheckCircle size={24} className="text-green-600 dark:text-green-400 mr-3" />
+                     <div>
+                       <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">
+                         🎉 Course Completed!
+                       </h3>
+                       <p className="text-green-600 dark:text-green-400 text-sm">
+                         Congratulations! You've finished all lessons in this course.
+                       </p>
+                     </div>
+                   </div>
+                   <div className="flex space-x-2">
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => navigate(`/courses/${courseId}`)}
+                       className="border-green-300 text-green-700 dark:border-green-600 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-800"
+                     >
+                       Back to Course
+                     </Button>
+                     {hasQuiz && (
+                       <Button
+                         size="sm"
+                         onClick={() => navigate(`/courses/${courseId}/quizzes/attempt`)}
+                         className="bg-green-600 hover:bg-green-700 text-white"
+                       >
+                         Take Quiz
+                       </Button>
+                     )}
+                   </div>
+                 </div>
+               </div>
+             )}
 
             {showNotes && (
               <div className="mt-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
@@ -395,6 +600,11 @@ const LessonView = () => {
                 {localLessons.filter((l: Lesson) => l.completed).length} of {localLessons.length} lessons
               </span>
             </div>
+            {localProgress > 0 && (
+              <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+                {localProgress === 100 ? "🎉 Course completed!" : `${localLessons.length - localLessons.filter((l: Lesson) => l.completed).length} lessons remaining`}
+              </div>
+            )}
             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mb-6">
               <div
                 className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full"

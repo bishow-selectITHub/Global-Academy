@@ -21,6 +21,7 @@ import {
   Brain,
   Flame,
   ArrowUpRight,
+  RefreshCw,
 } from "lucide-react"
 import { useDispatch, useSelector } from "react-redux"
 import { fetchEnrollments } from "../../store/enrollmentsSlice"
@@ -28,6 +29,7 @@ import type { RootState } from "../../store"
 import { Link, useNavigate } from "react-router-dom"
 import { useToast } from "../../components/ui/Toaster"
 import { useUser } from "../../contexts/UserContext"
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface Lesson {
   id: string
@@ -111,6 +113,17 @@ const StatCard = ({
     </div>
   )
 }
+
+const ChartCard = ({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) => (
+  <div className={`bg-white/80 backdrop-blur-sm dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-xl overflow-hidden ${className}`}>
+    <div className="px-6 py-4 bg-gradient-to-r from-slate-50/80 to-slate-100/80 dark:from-slate-700/20 dark:to-slate-600/20 border-b border-slate-200/50 dark:border-slate-700/50">
+      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+    </div>
+    <div className="p-6">
+      {children}
+    </div>
+  </div>
+)
 
 const ActivityItem = ({
   title,
@@ -235,6 +248,8 @@ const LearnerDashboard = () => {
   const completedCourses = enrollments.filter((e: any) => (e.progress || 0) >= 100).length
   const totalLearningHours = enrollments.length * 2.5 // Estimate
 
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="max-w-7xl mx-auto px-6 py-6">
@@ -256,6 +271,13 @@ const LearnerDashboard = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => dispatch(fetchEnrollments(user?.id))}
+              className="bg-white/80 backdrop-blur-sm dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-4 py-3 shadow-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 group"
+              title="Refresh enrollment data"
+            >
+              <RefreshCw className="w-5 h-5 text-slate-600 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200" />
+            </button>
             <div className="bg-white/80 backdrop-blur-sm dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-4 py-3 shadow-lg">
               <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
                 Today
@@ -268,7 +290,6 @@ const LearnerDashboard = () => {
                 })}
               </div>
             </div>
-
           </div>
         </div>
 
@@ -310,6 +331,139 @@ const LearnerDashboard = () => {
             iconBg="bg-gradient-to-br from-amber-500 to-amber-600"
             description="Across all courses"
           />
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Course Progress Chart */}
+          <ChartCard title="Course Progress Overview">
+            {enrollments.length === 0 ? (
+              <div className="flex items-center justify-center h-[300px]">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <BookOpen className="w-8 h-8 text-slate-400" />
+                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">No courses enrolled yet</p>
+                </div>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={enrollments.map((enrollment: any) => ({
+                  course: enrollment.course?.title?.substring(0, 20) + (enrollment.course?.title?.length > 20 ? '...' : ''),
+                  progress: enrollment.progress || 0,
+                  enrolled: enrollment.enrolled_at
+                }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis 
+                    dataKey="course" 
+                    stroke="#64748b"
+                    fontSize={10}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis 
+                    stroke="#64748b"
+                    fontSize={12}
+                    domain={[0, 100]}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                    formatter={(value: any) => [`${value}%`, 'Progress']}
+                  />
+                  <Line 
+                    type="monotone"
+                    dataKey="progress" 
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+                     {/* Weekly Learning Activity Chart */}
+           <ChartCard title="Weekly Learning Activity (Past 7 Days)">
+             {enrollments.length === 0 ? (
+               <div className="flex items-center justify-center h-[300px]">
+                 <div className="text-center">
+                   <div className="w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                     <Activity className="w-8 h-8 text-slate-400" />
+                   </div>
+                   <p className="text-sm text-slate-500 dark:text-slate-400">No learning activity yet</p>
+                 </div>
+               </div>
+             ) : (
+               <ResponsiveContainer width="100%" height={300}>
+                 <BarChart data={(() => {
+                   // Generate weekly data for the past 7 days
+                   const weeklyData = [];
+                   const now = new Date();
+                   
+                   for (let i = 6; i >= 0; i--) {
+                     const date = new Date(now);
+                     date.setDate(date.getDate() - i);
+                     
+                     // Calculate learning activity for this day (simulated based on enrollments)
+                     const dayActivity = enrollments.reduce((total: number, enrollment: any) => {
+                       // Simulate daily activity based on course progress and enrollment date
+                       const enrolledDate = new Date(enrollment.enrolled_at);
+                       const daysSinceEnrollment = Math.floor((now.getTime() - enrolledDate.getTime()) / (1000 * 60 * 60 * 24));
+                       
+                       if (daysSinceEnrollment <= i && daysSinceEnrollment >= i - 1) {
+                         // Higher activity for recent enrollments and active courses
+                         return total + (enrollment.progress || 0) / 100;
+                       }
+                       return total;
+                     }, 0);
+                     
+                     weeklyData.push({
+                       date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                       activity: Math.min(1, Math.max(0, dayActivity)),
+                       dateObj: date
+                     });
+                   }
+                   
+                   return weeklyData;
+                 })()}>
+                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                   <XAxis 
+                     dataKey="date" 
+                     stroke="#64748b"
+                     fontSize={12}
+                   />
+                   <YAxis 
+                     stroke="#64748b"
+                     fontSize={12}
+                     domain={[0, 1]}
+                     tickFormatter={(value) => `${Math.round(value * 100)}%`}
+                   />
+                   <Tooltip 
+                     contentStyle={{
+                       backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                       border: '1px solid #e2e8f0',
+                       borderRadius: '8px',
+                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                     }}
+                     formatter={(value: any) => [`${Math.round(value * 100)}%`, 'Learning Activity']}
+                   />
+                   <Bar 
+                     dataKey="activity" 
+                     fill="#8b5cf6"
+                     radius={[4, 4, 0, 0]}
+                     fillOpacity={0.8}
+                   />
+                 </BarChart>
+               </ResponsiveContainer>
+             )}
+           </ChartCard>
         </div>
 
         {/* Main Content Grid */}

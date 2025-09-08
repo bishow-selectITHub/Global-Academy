@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { createPortal } from "react-dom"
 import { supabase } from "../../../lib/supabase"
 import { useUser } from "../../../contexts/UserContext"
@@ -39,6 +39,12 @@ const AdminMeetings = () => {
     const [videoToken, setVideoToken] = useState<string | null>(null)
     const [videoUserName, setVideoUserName] = useState<string>("")
     const [currentSessionData, setCurrentSessionData] = useState<{ roomId: string; sessionId: string } | null>(null)
+    const [pendingRoomId, setPendingRoomId] = useState<string | null>(null)
+    const hostLiveRoomIdRef = useRef<string | null>(null)
+    const hostHmsRoomIdRef = useRef<string | null>(null)
+    const hasPersistedRef = useRef<boolean>(false)
+    const isPersistingRef = useRef<boolean>(false)
+    const persistFallbackTimerRef = useRef<NodeJS.Timeout | null>(null)
     const { user } = useUser()
     const { addToast } = useToast()
 
@@ -92,6 +98,18 @@ const AdminMeetings = () => {
 
         setJoiningSession(session.id)
         try {
+            // Reset persistence flags and cleanup from any previous session before starting a new one
+            if (persistFallbackTimerRef.current) {
+                clearTimeout(persistFallbackTimerRef.current)
+                persistFallbackTimerRef.current = null
+            }
+            hasPersistedRef.current = false
+            isPersistingRef.current = false
+            setCurrentSessionData(null)
+            hostLiveRoomIdRef.current = null
+            hostHmsRoomIdRef.current = null
+            setPendingRoomId(null)
+
             console.log("🚀 [DEBUG] handleJoinSession called with session:", {
                 sessionId: session.id,
                 sessionRoomId: session.room_id,
@@ -154,25 +172,90 @@ const AdminMeetings = () => {
                 tokenLength: tokenData.token?.length,
             })
 
-            // Set the video session data
+            // Persist the live_rooms.id synchronously to avoid state race
+            hostLiveRoomIdRef.current = session.id
+            hostHmsRoomIdRef.current = session.room_id
             setVideoToken(tokenData.token)
             setVideoUserName(user.name || user.email || "Admin")
-            setCurrentSessionData({
-                roomId: session.room_id,
-                sessionId: session.id,
-            })
+            // Track which live_rooms.id we're about to run as host
+            setPendingRoomId(session.id)
+            console.log("🚀 [DEBUG] pendingRoomId set to:", session.id)
+
+            // Fallback persist after join: poll for an active session id and persist if onSessionStarted didn't run
+            try {
+                if (persistFallbackTimerRef.current) {
+                    clearTimeout(persistFallbackTimerRef.current)
+                    persistFallbackTimerRef.current = null
+                }
+                persistFallbackTimerRef.current = setTimeout(async () => {
+                    if (hasPersistedRef.current || isPersistingRef.current) {
+                        console.log("[DEBUG] Fallback skipped; already persisted or persisting")
+                        return
+                    }
+                    try {
+                        console.log("[DEBUG] Fallback polling for active 100ms session…")
+                        const {
+                            data: { session: authSession },
+                        } = await supabase.auth.getSession()
+                        if (!authSession?.access_token) return
+                        const res = await fetch(GENERATE_TOKEN_ENDPOINT, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${authSession.access_token}`,
+                            },
+                            body: JSON.stringify({ room_id: session.room_id, role: "host", wait_for_active_session: true }),
+                        })
+                        const js = await res.json().catch(() => ({}))
+                        const fallbackSessionId = js?.session_id || js?.sessionInstanceId
+                        console.log("[DEBUG] Fallback token response:", { ok: res.ok, fallbackSessionId })
+                        const roomIdToUse = hostLiveRoomIdRef.current || session.id
+                        if (fallbackSessionId && roomIdToUse) {
+                            isPersistingRef.current = true
+                            const { data: existing } = await supabase
+                                .from("room_sessions")
+                                .select("session_id")
+                                .eq("session_id", fallbackSessionId)
+                                .maybeSingle()
+                            if (!existing) {
+                                const { data, error } = await supabase
+                                    .from("room_sessions")
+                                    .insert({ room_id: roomIdToUse, session_id: fallbackSessionId, active: true })
+                                    .select("id")
+                                    .single()
+                                if (!error && data?.id) {
+                                    console.log("[DEBUG] Fallback persisted room_sessions row", data.id)
+                                    setCurrentSessionData({ roomId: roomIdToUse, sessionId: data.id })
+                                    hasPersistedRef.current = true
+                                } else {
+                                    console.warn("[DEBUG] Fallback persist failed", error)
+                                }
+                            } else {
+                                console.log("[DEBUG] Fallback found existing room_sessions row; skipping insert")
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("[DEBUG] Fallback polling error", e)
+                    } finally {
+                        isPersistingRef.current = false
+                    }
+                }, 7000)
+            } catch (_) {
+                // ignore fallback error
+            }
 
             console.log("🚀 [DEBUG] Video session started successfully")
         } catch (error: any) {
-            console.error("Failed to start session:", error)
+            console.error("Error joining session:", error)
             addToast({
                 type: "error",
                 title: "Error",
-                message: error.message || "Failed to start session",
-                duration: 5000,
+                message: error.message || "Failed to join session.",
             })
-        } finally {
+            // Stop the button spinner on failure
             setJoiningSession(null)
+        } finally {
+            // Don't reset joiningSession here - let HMS component handle it
         }
     }
 

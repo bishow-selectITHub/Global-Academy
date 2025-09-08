@@ -74,7 +74,7 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
   const hostHmsRoomIdRef = useRef<string | null>(null)
   const hasPersistedRef = useRef<boolean>(false)
   const isPersistingRef = useRef<boolean>(false)
-  const persistFallbackTimerRef = useRef<number | null>(null)
+  const persistFallbackTimerRef = useRef<NodeJS.Timeout | null>(null)
   // Per-student details expansion and attendance
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
   const [userAttendanceMap, setUserAttendanceMap] = useState<Record<string, any[]>>({})
@@ -771,24 +771,90 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
         tokenLength: tokenData.token?.length
       })
 
-      // Set the pending room ID for the session started callback
-      setPendingRoomId(session.id)
+      // Persist the live_rooms.id synchronously to avoid state race
       hostLiveRoomIdRef.current = session.id
-
-      // Start the video session
+      hostHmsRoomIdRef.current = session.room_id
       setVideoToken(tokenData.token)
       setVideoUserName(authSession.user.id || "Host")
-      setJoiningSession(null)
+      // Track which live_rooms.id we're about to run as host
+      setPendingRoomId(session.id)
+      console.log("🚀 [DEBUG] pendingRoomId set to:", session.id)
+
+      // Fallback persist after join: poll for an active session id and persist if onSessionStarted didn't run
+      try {
+        if (persistFallbackTimerRef.current) {
+          clearTimeout(persistFallbackTimerRef.current)
+          persistFallbackTimerRef.current = null
+        }
+        persistFallbackTimerRef.current = setTimeout(async () => {
+          if (hasPersistedRef.current || isPersistingRef.current) {
+            console.log("[DEBUG] Fallback skipped; already persisted or persisting")
+            return
+          }
+          try {
+            console.log("[DEBUG] Fallback polling for active 100ms session…")
+            const {
+              data: { session: authSession },
+            } = await supabase.auth.getSession()
+            if (!authSession?.access_token) return
+            const res = await fetch(GENERATE_TOKEN_ENDPOINT, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authSession.access_token}`,
+              },
+              body: JSON.stringify({ room_id: session.room_id, role: "host", wait_for_active_session: true }),
+            })
+            const js = await res.json().catch(() => ({}))
+            const fallbackSessionId = js?.session_id || js?.sessionInstanceId
+            console.log("[DEBUG] Fallback token response:", { ok: res.ok, fallbackSessionId })
+            const roomIdToUse = hostLiveRoomIdRef.current || session.id
+            if (fallbackSessionId && roomIdToUse) {
+              isPersistingRef.current = true
+              const { data: existing } = await supabase
+                .from("room_sessions")
+                .select("session_id")
+                .eq("session_id", fallbackSessionId)
+                .maybeSingle()
+              if (!existing) {
+                const { data, error } = await supabase
+                  .from("room_sessions")
+                  .insert({ room_id: roomIdToUse, session_id: fallbackSessionId, active: true })
+                  .select("id")
+                  .single()
+                if (!error && data?.id) {
+                  console.log("[DEBUG] Fallback persisted room_sessions row", data.id)
+                  setCurrentSessionData({ roomId: roomIdToUse, sessionId: data.id })
+                  hasPersistedRef.current = true
+                } else {
+                  console.warn("[DEBUG] Fallback persist failed", error)
+                }
+              } else {
+                console.log("[DEBUG] Fallback found existing room_sessions row; skipping insert")
+              }
+            }
+          } catch (e) {
+            console.warn("[DEBUG] Fallback polling error", e)
+          } finally {
+            isPersistingRef.current = false
+          }
+        }, 7000)
+      } catch (_) {
+        // ignore fallback error
+      }
 
       console.log("🚀 [DEBUG] Video session started successfully")
     } catch (error: any) {
-      console.error("Failed to start session:", error)
-      addToast?.({
+      console.error("Error joining session:", error)
+      addToast({
         type: "error",
         title: "Error",
-        message: error.message || "Failed to start session",
+        message: error.message || "Failed to join session.",
       })
+      // Stop the button spinner on failure
       setJoiningSession(null)
+    } finally {
+      // Don't reset joiningSession here - let HMS component handle it
     }
   }
 
@@ -1832,24 +1898,158 @@ const HostLiveSession: React.FC<HostLiveSessionProps> = ({ course, onBack }) => 
             <HMSRoomKitHost
               token={videoToken}
               userName={videoUserName}
-              onRoomEnd={() => {
+              onRoomEnd={async () => {
+                if (persistFallbackTimerRef.current) {
+                  clearTimeout(persistFallbackTimerRef.current)
+                  persistFallbackTimerRef.current = null
+                }
+                if (currentSessionData) {
+                  try {
+                    // Update the room_sessions table to mark it as inactive
+                    await supabase
+                      .from("room_sessions")
+                      .update({ active: false })
+                      .eq("id", currentSessionData.sessionId)
+                      .eq("room_id", currentSessionData.roomId)
+
+                    // Also update the status of the parent `live_rooms` table to 'completed'
+                    await supabase.from("live_rooms").update({ status: "completed" }).eq("id", currentSessionData.roomId)
+
+                    console.log("Session ended and database updated.")
+                  } catch (error: any) {
+                    console.error("Error ending session:", error)
+                    addToast({
+                      type: "error",
+                      title: "Error",
+                      message: "Failed to end session properly.",
+                    })
+                  }
+                }
                 setVideoToken(null)
                 setVideoUserName("")
                 setCurrentSessionData(null)
+                // Reset flags so a new session can be persisted on next start
                 hasPersistedRef.current = false
                 isPersistingRef.current = false
                 hostLiveRoomIdRef.current = null
                 hostHmsRoomIdRef.current = null
                 setPendingRoomId(null)
                 setJoiningSession(null)
-                if (persistFallbackTimerRef.current) {
-                  clearTimeout(persistFallbackTimerRef.current)
-                  persistFallbackTimerRef.current = null
-                }
+                addToast({
+                  type: "success",
+                  title: "Session Ended",
+                  message: "Live session has been ended successfully.",
+                })
               }}
-              onSessionStarted={(sessionId) => {
-                console.log("🚀 [DEBUG] Session started with ID:", sessionId)
-                setCurrentSessionData(prev => prev ? { ...prev, sessionId } : null)
+              onSessionStarted={async (hmsSessionId, hmsRoomId) => {
+                try {
+                  if (hasPersistedRef.current || isPersistingRef.current) {
+                    console.log("[DEBUG] Skipping duplicate onSessionStarted persist")
+                    return
+                  }
+                  isPersistingRef.current = true
+                  console.log("🚀 [DEBUG] onSessionStarted called with:", {
+                    hmsSessionId,
+                    hmsRoomId,
+                    pendingRoomId,
+                  })
+
+                  // Use the pendingRoomId (from live_rooms.id) which we know
+                  const room_id =
+                    hostLiveRoomIdRef.current ||
+                    pendingRoomId ||
+                    (hmsRoomId ? (sessions.find((s) => s.room_id === hmsRoomId)?.id ?? null) : null)
+                  if (!room_id) {
+                    console.error("❌ Error: Live Room ID is missing. pendingRoomId:", pendingRoomId)
+                    isPersistingRef.current = false
+                    return
+                  }
+
+                  // Fetch the current user to get their ID
+                  const {
+                    data: { user },
+                  } = await supabase.auth.getUser()
+                  if (!user) {
+                    console.error("❌ Error: User not authenticated.")
+                    return
+                  }
+
+                  console.log("🚀 [DEBUG] Insert data for room_sessions:", {
+                    room_id,
+                    hmsSessionId,
+                    active: true,
+                    userId: user.id,
+                  })
+
+                  // Safely create or re-activate without requiring a DB unique index
+                  let newRoomSession: { id: string } | null = null
+                  let roomSessionError: any = null
+                  try {
+                    const { data: existing } = await supabase
+                      .from("room_sessions")
+                      .select("session_id")
+                      .eq("session_id", hmsSessionId)
+                      .maybeSingle()
+                    console.log("Existing Data:", existing)
+                    if (!existing) {
+                      const { data, error } = await supabase
+                        .from("room_sessions")
+                        .insert({ room_id: room_id, session_id: hmsSessionId, active: true })
+                        .select("id")
+                        .single()
+                      newRoomSession = data as any
+                      roomSessionError = error
+                    } else {
+                      newRoomSession = null
+                    }
+                  } catch (err) {
+                    roomSessionError = err
+                  }
+
+                  if (roomSessionError) {
+                    console.error("❌ Error creating room session:", roomSessionError)
+                    addToast({
+                      type: "error",
+                      title: "Database Error",
+                      message: "Failed to start room session in the database.",
+                    })
+                    return
+                  }
+
+                  // Update the local state with the new session data
+                  const createdId = newRoomSession?.id
+                  if (createdId) {
+                    setCurrentSessionData({ roomId: room_id, sessionId: createdId })
+                  }
+                  console.log("✅ Supabase insertion successful:", {
+                    roomSessionId: createdId,
+                    roomId: room_id,
+                    hmsSessionId: hmsSessionId,
+                  })
+
+                  // Also update the status of the parent `live_rooms` table to 'live'
+                  const { error: updateError } = await supabase
+                    .from("live_rooms")
+                    .update({ status: "live" })
+                    .eq("id", room_id)
+
+                  if (updateError) {
+                    console.error("❌ Error updating live_rooms status:", updateError)
+                  } else {
+                    console.log("✅ live_rooms status updated to 'live' for room:", room_id)
+                  }
+                  hasPersistedRef.current = true
+                } catch (e: any) {
+                  console.error("Failed to start session and update database:", e.message)
+                  addToast({
+                    type: "error",
+                    title: "Error",
+                    message: "Failed to start session properly.",
+                  })
+                } finally {
+                  isPersistingRef.current = false
+                  setJoiningSession(null) // Reset joining state after session starts
+                }
               }}
             />
           </div>

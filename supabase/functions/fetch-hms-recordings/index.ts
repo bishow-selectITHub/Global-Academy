@@ -169,30 +169,8 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Process each recording and store in recordings table
     let processedCount = 0
-
-    // Ensure storage bucket exists and is public (ignore limits to avoid 413 on free tier)
-    try {
-      const { data: existingBucket } = await supabase.storage.getBucket('recordings')
-      if (!existingBucket) {
-        console.log('[fetch-hms-recordings] bucket missing; please create it manually in dashboard as public: recordings')
-      }
-    } catch (e) {
-      console.error('[fetch-hms-recordings] error checking bucket (non-fatal):', e)
-    }
-
-    // Load existing recordings once to avoid duplicates and batch update at end
-    const { data: existingSession } = await supabase
-      .from('room_sessions')
-      .select('*')
-      .eq('room_id', room_id)
-      .single()
-
-    let existingRecordings: any[] = existingSession?.recordings || []
-    const idToIndex = new Map<string, number>()
-    existingRecordings.forEach((r: any, idx: number) => {
-      if (r && r.id) idToIndex.set(r.id, idx)
-    })
 
     // Process each recording
     for (const recording of recordings) {
@@ -248,113 +226,44 @@ Deno.serve(async (req) => {
           console.warn('[fetch-hms-recordings] download url retrieval failed', e)
         }
       }
-      if (!downloadUrl) {
-        // Save metadata-only entry so UI can list the recording even if not downloadable yet
-        const fileName = `${liveRoom.room_name}_${recording.id}.mp4`
-        const recordingData = {
-          id: recording.id,
-          url: null,
-          file_name: fileName,
-          created_at: recording.created_at,
-          started_at: recording.started_at,
-          stopped_at: recording.stopped_at,
-          size: (recording as any)?.size ?? null,
-          resolution: recording.resolution,
-          max_width: recording.max_width,
-          max_height: recording.max_height,
-          room_id: room_id,
-          room_name: liveRoom.room_name,
-          downloadable: false,
-          status: recording.status,
-        }
-        const idx = idToIndex.get(recording.id)
-        if (idx !== undefined) {
-          const prev = existingRecordings[idx]
-          const merged = { ...prev, ...recordingData }
-          existingRecordings[idx] = merged
-        } else {
-          idToIndex.set(recording.id, existingRecordings.length)
-          existingRecordings.push(recordingData)
-        }
-        processedCount++
-        continue
-      }
 
       try {
-        // Check if recording already exists in storage
+        // Store recording metadata with direct 100ms URL (no file download needed)
+        console.log(`[fetch-hms-recordings] storing recording metadata`, { id: recording.id })
+        
+        // Create recording metadata with direct 100ms URL
         const fileName = `${liveRoom.room_name}_${recording.id}.mp4`
-        const { data: existingFile } = await supabase.storage
-          .from('recordings')
-          .list(`${room_id}`, { search: fileName })
-
-        if (existingFile && existingFile.length > 0) {
-          console.log(`Recording ${recording.id} already exists, skipping`)
-          continue
-        }
-
-        // Download the recording file
-        console.log(`[fetch-hms-recordings] downloading recording`, { id: recording.id })
-        const recordingResponse = await fetch(downloadUrl, {
-          headers: {
-            Authorization: `Bearer ${HMS_MANAGEMENT_TOKEN}`,
-          },
-        })
-        if (!recordingResponse.ok) {
-          const errTxt = await recordingResponse.text().catch(() => '')
-          console.error(`[fetch-hms-recordings] failed to download`, { id: recording.id, status: recordingResponse.status, body: errTxt?.slice(0, 200) })
-          continue
-        }
-
-        const arrayBuf = await recordingResponse.arrayBuffer()
-        const recordingBlob = new Blob([new Uint8Array(arrayBuf)], { type: 'video/mp4' })
-
-        // Upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('recordings')
-          .upload(`${room_id}/${fileName}`, recordingBlob, {
-            contentType: 'video/mp4',
-            upsert: false
-          })
-
-        let publicUrl: string | null = null
-        if (uploadError) {
-          console.error(`Failed to upload recording ${recording.id}:`, uploadError)
-          // Fallback: store external URL from 100ms so UI can still play it
-          publicUrl = downloadUrl
-        } else {
-          // Get public URL of uploaded file
-          const { data: urlData } = supabase.storage
-            .from('recordings')
-            .getPublicUrl(`${room_id}/${fileName}`)
-          publicUrl = urlData.publicUrl
-        }
-
-        // Create recording metadata
         const recordingData = {
-          id: recording.id,
-          url: publicUrl,
+          recording_id: recording.id, // Use recording_id field from the table
+          room_id: room_id,
+          room_name: liveRoom.room_name,
           file_name: fileName,
-          created_at: recording.created_at,
-          started_at: recording.started_at,
-          stopped_at: recording.stopped_at,
-          size: (recording as any)?.size ?? arrayBuf.byteLength,
+          url: downloadUrl, // Direct 100ms URL
+          status: recording.status || 'completed',
           resolution: recording.resolution,
           max_width: recording.max_width,
           max_height: recording.max_height,
-          room_id: room_id,
-          room_name: liveRoom.room_name
+          source: recording.source || '100ms',
+          size: (recording as any)?.size ?? null,
+          duration: recording.started_at && recording.stopped_at 
+            ? Math.round((new Date(recording.stopped_at).getTime() - new Date(recording.started_at).getTime()) / 1000)
+            : null,
+          started_at: recording.started_at,
+          stopped_at: recording.stopped_at,
+          synced_at: new Date().toISOString()
         }
 
-        // Merge into existingRecordings by id (de-duplicate and update fields)
-        const idx = idToIndex.get(recording.id)
-        if (idx !== undefined) {
-          const prev = existingRecordings[idx]
-          const merged = { ...prev, ...recordingData }
-          existingRecordings[idx] = merged
-        } else {
-          idToIndex.set(recording.id, existingRecordings.length)
-          existingRecordings.push(recordingData)
+        // Insert into the new recordings table
+        const { error: insertError } = await supabase
+          .from("recordings")
+          .insert(recordingData)
+
+        if (insertError) {
+          console.error(`Failed to insert recording ${recording.id}:`, insertError)
+          continue
         }
+
+        console.log(`Recording ${recording.id} stored successfully in recordings table`)
         processedCount++
         console.log('[fetch-hms-recordings] processed recording', { id: recording.id })
 
@@ -362,23 +271,6 @@ Deno.serve(async (req) => {
         console.error(`[fetch-hms-recordings] error processing recording ${recording.id}:`, error)
         continue
       }
-    }
-
-    // Persist merged list once
-    if (existingSession) {
-      await supabase
-        .from('room_sessions')
-        .update({ recordings: existingRecordings })
-        .eq('room_id', room_id)
-    } else {
-      await supabase
-        .from('room_sessions')
-        .insert({
-          room_id: room_id,
-          session_id: room_id,
-          active: 'FALSE',
-          recordings: existingRecordings,
-        })
     }
 
     console.log('[fetch-hms-recordings] completed', { processedCount })

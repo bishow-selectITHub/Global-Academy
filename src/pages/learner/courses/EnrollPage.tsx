@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { GraduationCap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/Card';
@@ -11,6 +11,7 @@ import type { AppDispatch } from '../../../store';
 import { useUser } from '../../../contexts/UserContext';
 import { supabase } from '../../../lib/supabase';
 import { fetchEnrollments, invalidateEnrollmentsForUser } from '../../../store/enrollmentsSlice';
+import { fetchCourses, fetchCourseById } from '../../../store/coursesSlice';
 
 // Removed unused local interfaces
 
@@ -22,10 +23,38 @@ const EnrollPage = () => {
   const [isLoading, setIsLoading] = React.useState(false);
   const dispatch = useDispatch<AppDispatch>();
 
-  // Defensive check for courses slice
-  const courseSlice = useSelector((state: RootState) => state.courses || { data: [] });
-  const course = courseSlice.data.find((c: any) => c.id === courseId);
+  // Get courses from Redux store
+  const courses = useSelector((state: RootState) => state.courses.data);
+  const coursesLoading = useSelector((state: RootState) => state.courses.loading);
+  const course = courses.find((c: any) => c.id === courseId);
 
+  // Fetch course data if not available
+  useEffect(() => {
+    if (courseId && !course && !coursesLoading) {
+      // Try to fetch the specific course first
+      dispatch(fetchCourseById(courseId));
+    } else if (!courses.length && !coursesLoading) {
+      // If no courses at all, fetch all courses
+      dispatch(fetchCourses());
+    }
+  }, [courseId, course, courses, coursesLoading, dispatch]);
+
+  // Show loading state while fetching
+  if (coursesLoading || (!course && courses.length === 0)) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-slate-200 rounded w-1/4 mb-6"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="h-64 bg-slate-200 rounded-lg"></div>
+            <div className="h-64 bg-slate-200 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show course not found after loading is complete
   if (!course) {
     return (
       <div className="text-center py-12">
@@ -149,29 +178,9 @@ const EnrollPage = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-slate-200 rounded w-1/4 mb-6"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="h-64 bg-slate-200 rounded-lg"></div>
-            <div className="h-64 bg-slate-200 rounded-lg"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  if (!course) {
-    return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Course not found</h2>
-        <p className="text-slate-600 mb-6">The course you're trying to enroll in does not exist.</p>
-        <Button onClick={() => navigate('/courses')}>Back to Course Catalog</Button>
-      </div>
-    );
-  }
+
+
 
   return (
     <div className="container mx-auto px-4 py-8 min-h-[calc(100vh-100px)]">
